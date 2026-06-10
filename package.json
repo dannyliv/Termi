@@ -1,0 +1,41 @@
+{
+  "name": "termi",
+  "version": "0.1.0",
+  "description": "Termi is a friendly coding buddy for kids. Build games, art, stories, and websites right from your computer, with a grown-up approved AI helper and strong safety rails.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "bin": {
+    "termi": "bin/termi.js"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.82",
+    "@ai-sdk/openai": "^3.0.69",
+    "@ai-sdk/xai": "^3.0.93",
+    "@clack/prompts": "^1.5.1",
+    "@napi-rs/keyring": "^1.3.0",
+    "ai": "^6.0.199",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
+    "figlet": "^1.11.0",
+    "gradient-string": "^3.0.0",
+    "is-unicode-supported": "^2.1.0",
+    "open": "^11.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/figlet": "^1.7.0",
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.8"
+  }
+}
