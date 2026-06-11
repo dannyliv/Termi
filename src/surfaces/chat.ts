@@ -353,6 +353,14 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
       case 'badges':
         say(renderBadgeShelf(loadBadges()));
         break;
+      case 'learn':
+        try {
+          const learn = await import('../learn/runner.js');
+          await learn.runLearnMenu();
+        } catch {
+          say('Learn mode is taking a nap. Try again soon.');
+        }
+        break;
       case 'help':
         say(helpText());
         break;

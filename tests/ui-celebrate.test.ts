@@ -27,6 +27,12 @@ describe('badges', () => {
       'bug-squasher',
       'remixer',
       'five-projects',
+      'learn-1',
+      'learn-2',
+      'learn-3',
+      'learn-4',
+      'learn-5',
+      'learn-6',
     ]);
   });
 
@@ -46,7 +52,7 @@ describe('renderBadgeShelf', () => {
     chalk.level = 0;
     const shelf = renderBadgeShelf(['first-project']);
     expect(shelf).toContain('First Project');
-    expect(shelf).toContain('You earned 1 of 6 badges.');
+    expect(shelf).toContain('You earned 1 of 12 badges.');
     expect(shelf).toContain('Make five projects.');
   });
 
@@ -54,7 +60,7 @@ describe('renderBadgeShelf', () => {
     process.env['TERMI_ASCII'] = '1';
     chalk.level = 0;
     const shelf = renderBadgeShelf(['mystery-badge']);
-    expect(shelf).toContain('You earned 0 of 6 badges.');
+    expect(shelf).toContain('You earned 0 of 12 badges.');
   });
 });
 

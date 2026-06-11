@@ -52,6 +52,42 @@ export const BADGES: readonly BadgeDef[] = [
     emoji: '\u{1F3C6}',
     hint: 'Make five projects.',
   },
+  {
+    id: 'learn-1',
+    label: 'AI Spotter',
+    emoji: '\u{1F916}',
+    hint: 'Finish the Meet your AI helper lesson.',
+  },
+  {
+    id: 'learn-2',
+    label: 'Prompt Pro',
+    emoji: '✨',
+    hint: 'Finish the Super prompts lesson.',
+  },
+  {
+    id: 'learn-3',
+    label: 'Step Master',
+    emoji: '\u{1F422}',
+    hint: 'Finish the Small steps win lesson.',
+  },
+  {
+    id: 'learn-4',
+    label: 'Code Detective',
+    emoji: '\u{1F50D}',
+    hint: 'Finish the Be a code detective lesson.',
+  },
+  {
+    id: 'learn-5',
+    label: 'Bug Tamer',
+    emoji: '\u{1F527}',
+    hint: 'Finish the When it goes wrong lesson.',
+  },
+  {
+    id: 'learn-6',
+    label: 'The Boss',
+    emoji: '\u{1F451}',
+    hint: 'Finish the You are the boss lesson.',
+  },
 ];
 
 export interface ConfettiOptions {

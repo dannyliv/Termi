@@ -365,6 +365,7 @@ export async function showHome(settings: Settings): Promise<void> {
       { value: 'open', label: T.home.menuGo },
       { value: 'new', label: T.home.menuNew },
       { value: 'ideas', label: T.home.menuIdeas },
+      { value: 'learn', label: 'Learn AI tricks' },
       { value: 'badges', label: T.home.menuBadges },
       { value: 'grownups', label: T.home.menuGrownups },
       { value: 'quit', label: T.home.menuQuit },
@@ -392,6 +393,13 @@ export async function showHome(settings: Settings): Promise<void> {
       await executeIdeas(scaffoldId, (text) => {
         console.log(text);
       });
+    } else if (pick === 'learn') {
+      try {
+        const learn = await import('../learn/runner.js');
+        await learn.runLearnMenu();
+      } catch {
+        p.log.warn('Learn mode is taking a nap. Try again soon.');
+      }
     } else if (pick === 'badges') {
       console.log(renderBadgeShelf(loadBadges()));
     } else if (pick === 'grownups') {

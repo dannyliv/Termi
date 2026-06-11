@@ -19,6 +19,7 @@ export const COMMAND_NAMES = [
   'new',
   'ideas',
   'badges',
+  'learn',
   'help',
   'done',
   'grownups',
@@ -34,6 +35,7 @@ export const BARE_WORDS: readonly CommandName[] = [
   'done',
   'preview',
   'badges',
+  'learn',
 ];
 
 export type Command =
@@ -111,6 +113,7 @@ export function helpText(): string {
     ['/new', 'start a fresh project'],
     ['/ideas', 'get fun ideas'],
     ['/badges', 'see your badges'],
+    ['/learn', 'play short AI lessons'],
     ['/help', 'show this list'],
     ['/done', 'finish and celebrate'],
     ['/grownups', 'grown-up zone, PIN needed'],

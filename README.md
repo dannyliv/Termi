@@ -8,6 +8,8 @@ You can make dodge games, platform games, pixel art, dance music, virtual pets, 
 
 Termi is a computer program, an AI tool. It is not a person. A grown-up sets it up first.
 
+Want to get good at building with AI? Type `termi learn`. Six short lessons teach you how to be the boss of your AI helper. Each one earns a badge, and you can replay them any time.
+
 Ready? Ask a grown-up to read the next part.
 
 ---
@@ -63,6 +65,7 @@ If you skip the provider step, Termi runs in offline mode: your kid can still cr
 | `termi go [name]` | Open a project and build. With no name, pick from a list. |
 | `termi preview [name]` | Open a project in the browser without the chat. |
 | `termi ideas` | Print fun project ideas. |
+| `termi learn` | Six short, replayable lessons on building with AI. Fully offline, no AI calls. |
 | `termi grownups` | The grown-up zone. PIN required. |
 | `termi help` | Show the command list. |
 | `termi --version` | Show the version. |
@@ -77,11 +80,12 @@ Inside the build chat, these slash commands work:
 | `/new` | Start a fresh project. |
 | `/ideas` | Get fun ideas. |
 | `/badges` | See earned badges. |
+| `/learn` | Play the short AI lessons. |
 | `/help` | Show this list. |
 | `/done` | Finish and celebrate. |
 | `/grownups` | Grown-up zone, PIN required. |
 
-Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, and `badges` work on their own, no slash needed. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
+Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, `badges`, and `learn` work on their own, no slash needed. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
 
 In the grown-up zone you can add or switch providers, change the safety level, pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives.
 

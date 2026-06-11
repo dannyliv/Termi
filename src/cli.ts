@@ -53,6 +53,7 @@ export function cliHelp(): string {
     '  termi go [name]  open a project and build',
     '  termi preview    watch a project run',
     '  termi ideas      get fun ideas',
+    '  termi learn      play six short lessons about AI',
     '  termi grownups   grown-up zone (PIN needed)',
     '  termi help       show this help',
     '  termi --version  show the version',
@@ -189,6 +190,11 @@ async function route(command: string, rest: string[], settings: Settings): Promi
     }
     case 'ideas': {
       await routeIdeas(settings);
+      return;
+    }
+    case 'learn': {
+      const learn = await import('./learn/runner.js');
+      await learn.runLearnMenu();
       return;
     }
     case 'grownups': {
