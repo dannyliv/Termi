@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeChatgptFetch } from '../src/providers/index.js';
+import { CHATGPT_FALLBACK_INSTRUCTIONS, makeChatgptFetch } from '../src/providers/index.js';
 
 interface CapturedCall {
   input: string;
@@ -87,7 +87,9 @@ describe('makeChatgptFetch', () => {
     expect(sent.input).toHaveLength(0);
   });
 
-  it('leaves a body without a system message unchanged', async () => {
+  it('adds fallback instructions to a body without a system message', async () => {
+    // The backend 400s ("Instructions are required") on prompt-only calls
+    // like the safety classifier, so the shim must always send instructions.
     const { calls, fetchImpl } = capturingFetch();
     const shim = makeChatgptFetch(() => Promise.resolve('t'), fetchImpl);
     const body = JSON.stringify({
@@ -95,16 +97,60 @@ describe('makeChatgptFetch', () => {
       input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
     });
     await shim('https://example.test/responses', { method: 'POST', body });
-    expect(calls[0]!.init?.body).toBe(body);
+    const sent = JSON.parse(String(calls[0]!.init?.body)) as {
+      instructions: string;
+      input: unknown[];
+      store: boolean;
+    };
+    expect(sent.instructions).toBe(CHATGPT_FALLBACK_INSTRUCTIONS);
+    expect(sent.input).toHaveLength(1);
+    expect(sent.store).toBe(false);
     expect(headersOf(calls[0]!).get('authorization')).toBe('Bearer t');
   });
 
-  it('leaves a body with existing instructions unchanged', async () => {
+  it('defaults store to false when the caller did not set it', async () => {
+    // The backend 400s with "Store must be set to false" otherwise.
     const { calls, fetchImpl } = capturingFetch();
     const shim = makeChatgptFetch(() => Promise.resolve('t'), fetchImpl);
     const body = JSON.stringify({
       model: 'm',
       instructions: 'already set',
+      input: [{ type: 'message', role: 'developer', content: 'should stay' }],
+    });
+    await shim('https://example.test/responses', { method: 'POST', body });
+    const sent = JSON.parse(String(calls[0]!.init?.body)) as {
+      instructions: string;
+      input: unknown[];
+      store: boolean;
+    };
+    expect(sent.instructions).toBe('already set');
+    expect(sent.input).toHaveLength(1);
+    expect(sent.store).toBe(false);
+  });
+
+  it('strips params the backend rejects (max_output_tokens)', async () => {
+    const { calls, fetchImpl } = capturingFetch();
+    const shim = makeChatgptFetch(() => Promise.resolve('t'), fetchImpl);
+    const body = JSON.stringify({
+      model: 'm',
+      instructions: 'already set',
+      store: false,
+      max_output_tokens: 150,
+      input: [],
+    });
+    await shim('https://example.test/responses', { method: 'POST', body });
+    const sent = JSON.parse(String(calls[0]!.init?.body)) as Record<string, unknown>;
+    expect('max_output_tokens' in sent).toBe(false);
+    expect(sent.instructions).toBe('already set');
+  });
+
+  it('leaves a body with instructions and store already set unchanged', async () => {
+    const { calls, fetchImpl } = capturingFetch();
+    const shim = makeChatgptFetch(() => Promise.resolve('t'), fetchImpl);
+    const body = JSON.stringify({
+      model: 'm',
+      instructions: 'already set',
+      store: false,
       input: [{ type: 'message', role: 'developer', content: 'should stay' }],
     });
     await shim('https://example.test/responses', { method: 'POST', body });

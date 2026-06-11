@@ -1,0 +1,130 @@
+# Termi
+
+Termi is a friendly robot that helps you build things on a real computer.
+
+You type what you want. Termi writes the code with you. Your game opens in the browser right away.
+
+You can make dodge games, platform games, pixel art, dance music, virtual pets, adventure stories, quizzes, your own web page, and talking characters. If you change your mind, type `undo` and the last change is gone. When something works, you earn badges.
+
+Termi is a computer program, an AI tool. It is not a person. A grown-up sets it up first.
+
+Ready? Ask a grown-up to read the next part.
+
+---
+
+## For parents and guardians
+
+Termi is a kids-friendly coding assistant that runs entirely in the terminal on your own computer. A kid describes what they want in plain words, an AI model you configure writes small web projects (plain HTML, CSS, and JavaScript), and a local preview shows the result instantly. Every message in and out passes a layered safety pipeline, and everything is stored locally. There are no Termi servers and no telemetry.
+
+Please read [SAFETY.md](SAFETY.md) before handing the keyboard to your kid. It explains, honestly, how the safety system works, what it can and cannot stop, and how to remove everything.
+
+### Requirements
+
+- Node.js 20.19 or newer: https://nodejs.org
+- macOS, Windows, or Linux
+- An AI account you own (one of: a ChatGPT account, a Claude API key, an OpenAI API key, or a Grok API key)
+
+If Node is too old, Termi prints a plain message with the download link instead of starting.
+
+### Install
+
+This is a private repository, so install from a clone:
+
+```
+git clone git@github.com:dannyliv/Termi.git
+cd Termi
+npm install
+npm run build
+npm link
+```
+
+After `npm link`, the `termi` command works from any folder. To remove it later, run `npm rm -g termi` (full cleanup steps are in SAFETY.md).
+
+### First run: the setup wizard
+
+Run `termi`. The first run starts a setup wizard for a parent or guardian. It takes about five minutes:
+
+1. **Create a grown-up PIN** (at least 4 characters). It guards the grown-up zone. Your kid should not know it.
+2. **Age band and consent.** You pick "Under 13" or "13 or older" and confirm that Termi uses an AI account you own and that you agree to watch how your kid uses it. This consent is recorded in the local safety log.
+3. **Pick an AI provider.** The default is "ChatGPT sign-in": your browser opens, you sign in to your own ChatGPT account, and no API key is needed. The other options are a Claude API key, an OpenAI API key, or a Grok API key. Grok requires an extra confirmation because the xAI API terms are adults-only (details in SAFETY.md). You can add several providers and choose which one is active.
+4. **Pick a safety level.** Strict is the default and the right choice for most kids.
+5. **Hand the keyboard to your kid.** The kid picks a made-up nickname (Termi asks them not to use their real name) and sees a clear disclosure: "Termi is a computer program, an AI. It is a tool a grown-up set up for you. It is not a person."
+6. **Desktop shortcut.** Termi offers to write a double-clickable launcher on the Desktop (`Termi.command` on macOS, `Termi.bat` on Windows, `Termi.desktop` on Linux) so your kid can come back tomorrow without typing commands.
+7. **Optional first game.** Two keypresses later there is a running game in the browser.
+
+If you skip the provider step, Termi runs in offline mode: your kid can still create projects, play them in the preview, undo changes, and browse ideas. The chat shows a kind "ask a grown-up to set up the AI helper" screen.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `termi` | First run: setup wizard. After that: the home menu. |
+| `termi new` | Start a new project. |
+| `termi go [name]` | Open a project and build. With no name, pick from a list. |
+| `termi preview [name]` | Open a project in the browser without the chat. |
+| `termi ideas` | Print fun project ideas. |
+| `termi grownups` | The grown-up zone. PIN required. |
+| `termi help` | Show the command list. |
+| `termi --version` | Show the version. |
+
+Inside the build chat, these slash commands work:
+
+| In chat | What it does |
+|---|---|
+| `/preview` | Open the project in the browser. |
+| `/undo` | Take back the last change. |
+| `/redo` | Bring a change back. |
+| `/new` | Start a fresh project. |
+| `/ideas` | Get fun ideas. |
+| `/badges` | See earned badges. |
+| `/help` | Show this list. |
+| `/done` | Finish and celebrate. |
+| `/grownups` | Grown-up zone, PIN required. |
+
+Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, and `badges` work on their own, no slash needed. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
+
+In the grown-up zone you can add or switch providers, change the safety level, pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives.
+
+### The nine project types
+
+| Project type | What your kid builds | Styles |
+|---|---|---|
+| 🎮 Games | A quick dodge game. A great first project. | Space Rocks, Neon Star Run, Spooky Bats, Soccer Headers |
+| 🕹️ Big Games | A bigger platform game with two levels. The game engine ships as a local file, no internet needed. | Castle Quest, Blocky Mine World, Haunted House, Midnight Wolf Pack |
+| 🎨 Pixel Studio | A pixel paint studio. Calm and creative. | Free Draw, Pet Portraits |
+| 🎵 Dance Party | A music maker with sounds made right in the browser. | Robot Dance, Glow Disco |
+| 🐾 My Pet | A virtual pet that remembers its care between visits. | Dragon, Wild Horses |
+| 📖 Story Quest | A choose-your-own-adventure story engine. | Dragon Treasure, Mystery at School |
+| ❓ Quiz Show | A quiz maker for friends and family. | Animal Trivia, Which Character Are You? |
+| 🌐 My Page | A personal web page, saved only on this computer. | About Me, My Team |
+| 🤖 Talking Character | A scripted talking character. The kid writes every line it can say. No AI runs inside the project. | Quiz Host, Sidekick Robot |
+
+Projects live in `~/Termi/<project-name>/` as plain files (typically `index.html`, `style.css`, and one JavaScript file, plus a `TERMI.md` notes file). They are capped at 8 files of 256 KB each, use no build step, and work with zero network access. Once a kid has a project, `termi new` also offers "Remix one of your projects."
+
+On the My Page projects, personal details like a name are typed directly on the page in the browser preview and saved to the browser's local storage on this computer. They never pass through the chat, so they never reach the AI provider.
+
+### How the preview works
+
+Each open project gets its own tiny web server bound to `127.0.0.1` only. It is not reachable from other devices on your network. It starts at port 4311 and scans upward if that port is busy. Every page is served with a strict Content-Security-Policy that blocks all outside network access from the project, and the page reloads automatically when Termi changes a file. Dotfiles and the `TERMI.md` notes are never served.
+
+### More than one kid
+
+Termi's v1 stance is simple: one operating system user account per kid. Settings, the PIN, projects, badges, and the safety log all live in the OS user profile, so separate OS accounts keep kids' worlds (and the audit trail) separate. There are no in-app profiles.
+
+### Troubleshooting
+
+- **"Termi needs a newer version of Node.js."** Install the current version from https://nodejs.org, then run `termi` again.
+- **"The AI helper is not set up yet."** No provider is configured. Run `termi grownups`, open Providers, and add one. Projects, previews, undo, ideas, and badges all work without a provider.
+- **"Termi used up its energy. It comes back at 4:30 PM."** Your AI plan or API key hit its rate limit. The time comes from the provider when it says how long to wait. Your kid can keep playing the preview, use `/undo`, and browse `/ideas` meanwhile.
+- **"Termi needs a quick break. Try again in a minute."** A safety check could not finish (a timeout, a provider error, or a rate limit). Termi blocks rather than guesses, so it pauses the turn. Trying again usually works.
+- **"The sign-in stopped working."** The saved ChatGPT sign-in can no longer refresh. Run `termi grownups`, open Providers, and sign in again.
+- **"Termi found changed settings. Safe settings are on now."** The settings file failed its integrity check, so Termi reverted to strict defaults. Review the grown-up zone.
+- **Crashes.** The kid sees a friendly screen; the technical details go to `~/.termi/error.log`.
+
+### Uninstall
+
+See "Your data and how to remove Termi" in [SAFETY.md](SAFETY.md) for the exact folders, files, and keychain entries.
+
+## Disclaimer
+
+Termi is a personal, educational project provided as-is, without warranty of any kind. It connects to AI services using accounts that you, the parent or guardian, own and control. AI output is unpredictable; the safety layers reduce risk but cannot eliminate it, and children should use Termi with adult supervision. Termi is an independent project and is not affiliated with, endorsed by, or sponsored by OpenAI, Anthropic, xAI, or any other AI provider. Use at your own risk.

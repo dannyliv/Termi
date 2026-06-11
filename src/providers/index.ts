@@ -6,10 +6,12 @@
  * tests never touch the network.
  */
 
+import { createHash } from 'node:crypto';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createXai } from '@ai-sdk/xai';
 import { getSecret } from '../auth/keychain.js';
+import { loadSettings } from '../config/settings.js';
 import { PROTOCOL_ORIGINATOR, type FetchLike } from '../auth/oauth.js';
 import { getValidAccessToken, loadTokens } from '../auth/tokens.js';
 import type { ModelAlias, ProviderClient, ProviderId, Settings } from '../types.js';
@@ -27,6 +29,11 @@ export interface ProviderDeps {
   readSecret?: (account: string) => string | null;
   /** Injectable access token source for the ChatGPT path. */
   getAccessToken?: () => Promise<string>;
+  /**
+   * Install id used to derive the hashed safety identifier sent on
+   * OpenAI platform API calls. Defaults to the saved settings value.
+   */
+  installId?: string | null;
 }
 
 function isSystemLikeMessage(item: unknown): boolean {
@@ -63,9 +70,25 @@ function messageText(item: unknown): string | null {
 }
 
 /**
- * The one load-bearing body shim for the ChatGPT backend: it requires the
- * system prompt as a top-level "instructions" string. The AI SDK emits it
- * as a developer message inside input[]. Promote it and drop the message.
+ * Sent as instructions when a request carries no system message at all
+ * (for example a prompted classifier call). The backend rejects requests
+ * without a top-level instructions string.
+ */
+export const CHATGPT_FALLBACK_INSTRUCTIONS = 'Follow the latest user message exactly.';
+
+/**
+ * Body params the ChatGPT coding backend rejects with a 400
+ * ("Unsupported parameter"). Verified live against the backend.
+ */
+const CHATGPT_REJECTED_PARAMS = ['max_output_tokens'] as const;
+
+/**
+ * The load-bearing body shim for the ChatGPT backend. The backend requires
+ * a top-level "instructions" string and store set to false on every call.
+ * The AI SDK emits the system prompt as a developer message inside input[],
+ * so promote it and drop the message. Requests without any system message
+ * (for example classifier calls) get a neutral fallback instruction, and
+ * store defaults to false when the caller did not set it.
  * Returns null when the body needs no change.
  */
 function promoteInstructions(body: string): string | null {
@@ -79,24 +102,32 @@ function promoteInstructions(body: string): string | null {
     return null;
   }
   const obj = parsed as Record<string, unknown>;
-  if ('instructions' in obj && obj.instructions !== null && obj.instructions !== undefined) {
-    return null;
+  let changed = false;
+  if (obj.store === undefined || obj.store === null) {
+    obj.store = false;
+    changed = true;
   }
+  for (const param of CHATGPT_REJECTED_PARAMS) {
+    if (param in obj) {
+      delete obj[param];
+      changed = true;
+    }
+  }
+  const hasInstructions =
+    'instructions' in obj && obj.instructions !== null && obj.instructions !== undefined;
   const input = obj.input;
-  if (!Array.isArray(input)) {
-    return null;
+  if (!hasInstructions && Array.isArray(input)) {
+    const index = input.findIndex((item) => isSystemLikeMessage(item));
+    const text = index >= 0 ? messageText(input[index]) : null;
+    if (index >= 0 && text !== null) {
+      obj.instructions = text;
+      obj.input = [...input.slice(0, index), ...input.slice(index + 1)];
+    } else {
+      obj.instructions = CHATGPT_FALLBACK_INSTRUCTIONS;
+    }
+    changed = true;
   }
-  const index = input.findIndex((item) => isSystemLikeMessage(item));
-  if (index < 0) {
-    return null;
-  }
-  const text = messageText(input[index]);
-  if (text === null) {
-    return null;
-  }
-  obj.instructions = text;
-  obj.input = [...input.slice(0, index), ...input.slice(index + 1)];
-  return JSON.stringify(obj);
+  return changed ? JSON.stringify(obj) : null;
 }
 
 /**
@@ -125,6 +156,50 @@ export function makeChatgptFetch(
       }
     }
     return baseFetch(input, nextInit);
+  };
+  return wrapped as FetchLike;
+}
+
+/**
+ * Hashes the install id into an anonymous, stable safety identifier.
+ * Sent on OpenAI platform API calls so any abuse flag lands on this
+ * one install instead of the whole account, per the provider's
+ * guidance for products used by minors. Never reversible to the id.
+ */
+export function hashedSafetyIdentifier(installId: string): string {
+  return createHash('sha256').update(`termi:${installId}`).digest('hex').slice(0, 40);
+}
+
+/**
+ * Wraps fetch for the OpenAI platform API: injects safety_identifier
+ * into JSON request bodies that do not already carry one. Bodies that
+ * are not JSON objects pass through untouched.
+ */
+export function makeSafetyIdFetch(
+  getInstallId: () => string | null,
+  baseFetch: FetchLike = globalThis.fetch,
+): FetchLike {
+  const wrapped = async (
+    input: Parameters<FetchLike>[0],
+    init?: Parameters<FetchLike>[1],
+  ): Promise<Response> => {
+    const body = init?.body;
+    const installId = getInstallId();
+    if (typeof body === 'string' && installId !== null && installId.length > 0) {
+      try {
+        const obj: unknown = JSON.parse(body);
+        if (obj !== null && typeof obj === 'object' && !Array.isArray(obj)) {
+          const record = obj as Record<string, unknown>;
+          if (!('safety_identifier' in record)) {
+            record.safety_identifier = hashedSafetyIdentifier(installId);
+            return baseFetch(input, { ...(init ?? {}), body: JSON.stringify(record) });
+          }
+        }
+      } catch {
+        // Not JSON: pass through unchanged.
+      }
+    }
+    return baseFetch(input, init);
   };
   return wrapped as FetchLike;
 }
@@ -185,9 +260,16 @@ export function createProviderClient(
       if (key === null || key.length === 0) {
         throw new Error('provider-not-configured:openai-api');
       }
+      const getInstallId = (): string | null => {
+        if (deps.installId !== undefined) {
+          return deps.installId;
+        }
+        const id = loadSettings().settings.installId;
+        return id.length > 0 ? id : null;
+      };
       const provider = createOpenAI({
         apiKey: key,
-        ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
+        fetch: makeSafetyIdFetch(getInstallId, fetchImpl ?? globalThis.fetch),
       });
       return {
         id: providerId,

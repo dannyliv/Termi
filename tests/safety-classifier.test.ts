@@ -1,4 +1,4 @@
-import { MockLanguageModelV3 } from 'ai/test';
+import { MockLanguageModelV3, simulateReadableStream } from 'ai/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { verdictToScreen } from '../src/safety/blocks.js';
 import { createSafetyPipeline, type SafetyPipelineDeps } from '../src/safety/classifier.js';
@@ -10,13 +10,22 @@ import { ALLOWED_VERDICT_JSON, MUST_BLOCK, MUST_NOT_BLOCK, mockVerdictFor } from
 /** A mock classifier model that replies with a fixed verdict JSON. */
 function verdictModel(json: string, onPrompt?: (prompt: string) => void): MockLanguageModelV3 {
   return new MockLanguageModelV3({
-    doGenerate: async (options) => {
+    doStream: async (options) => {
       onPrompt?.(JSON.stringify(options.prompt));
       return {
-        finishReason: { unified: 'stop' as const },
-        usage: { inputTokens: { total: 1 }, outputTokens: { total: 1 } },
-        content: [{ type: 'text' as const, text: json }],
-        warnings: [],
+        stream: simulateReadableStream({
+          chunks: [
+            { type: 'stream-start' as const, warnings: [] },
+            { type: 'text-start' as const, id: '1' },
+            { type: 'text-delta' as const, id: '1', delta: json },
+            { type: 'text-end' as const, id: '1' },
+            {
+              type: 'finish' as const,
+              finishReason: { unified: 'stop' as const },
+              usage: { inputTokens: { total: 1 }, outputTokens: { total: 1 } },
+            },
+          ],
+        }),
       };
     },
   });
@@ -25,7 +34,7 @@ function verdictModel(json: string, onPrompt?: (prompt: string) => void): MockLa
 /** A model whose call never resolves: forces the timeout path. */
 function hangingModel(): MockLanguageModelV3 {
   return new MockLanguageModelV3({
-    doGenerate: () => new Promise(() => {}),
+    doStream: () => new Promise(() => {}),
   });
 }
 

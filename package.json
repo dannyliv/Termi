@@ -8,6 +8,13 @@
   "bin": {
     "termi": "bin/termi.js"
   },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "SAFETY.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=20.19.0"
   },

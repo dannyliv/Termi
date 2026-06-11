@@ -22,8 +22,8 @@ const KID_FILES = ['index.html', 'style.css', 'game.js'];
 const ALL_FILES = [...KID_FILES, 'TERMI.md'];
 const PRETTY = 'Max & "Rex" <Quest>';
 
-/** Em-dash, en-dash, figure dash, horizontal bar, minus sign. */
-const BAD_DASHES = /[‐‑‒–—―−]/;
+/** U+2010 to U+2015 (hyphen to horizontal bar) plus U+2212 (minus sign). */
+const BAD_DASHES = /[\u2010-\u2015\u2212]/;
 
 const NETWORK_TOKENS = [
   'http://',

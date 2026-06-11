@@ -11,7 +11,7 @@
  * - Without one: a single prompted classifier covers the full taxonomy.
  */
 
-import { generateText, type LanguageModel } from 'ai';
+import { streamText, type LanguageModel } from 'ai';
 import type {
   AuditEvent,
   ClassifierVerdict,
@@ -165,13 +165,30 @@ async function promptedCheck(
   composedWindow: string,
   scope: 'full' | 'kidcheck',
 ): Promise<ClassifierVerdict> {
-  const result = await generateText({
+  // streamText, not generateText: the ChatGPT coding backend requires
+  // stream true on every call. The text is collected, never revealed.
+  let streamError: unknown = null;
+  const result = streamText({
     model,
     prompt: buildClassifierPrompt(direction, composedWindow, scope),
     temperature: 0,
     maxOutputTokens: 150,
+    onError: ({ error }) => {
+      if (streamError === null) {
+        streamError = error;
+      }
+    },
   });
-  return parseVerdict(result.text);
+  let text: string;
+  try {
+    text = await result.text;
+  } catch (err) {
+    throw streamError ?? err;
+  }
+  if (streamError !== null) {
+    throw streamError;
+  }
+  return parseVerdict(text);
 }
 
 export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {

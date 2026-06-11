@@ -1,4 +1,4 @@
-import { APICallError } from 'ai';
+import { APICallError, RetryError } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { classifyProviderError, describeForKid } from '../src/providers/errors.js';
 import { T } from '../src/ui/text.js';
@@ -37,6 +37,16 @@ describe('classifyProviderError', () => {
     const result = classifyProviderError(apiError(429));
     expect(result.kind).toBe('rate-limit');
     expect(result.retryAfter).toBeUndefined();
+  });
+
+  it('unwraps a RetryError and classifies the last underlying error', () => {
+    const inner = apiError(429, { 'retry-after': '45' });
+    const wrapped = new RetryError({
+      message: 'Failed after 3 attempts.',
+      reason: 'maxRetriesExceeded',
+      errors: [apiError(429), inner],
+    });
+    expect(classifyProviderError(wrapped)).toEqual({ kind: 'rate-limit', retryAfter: 45 });
   });
 
   it('maps 401 and 403 to auth', () => {

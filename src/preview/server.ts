@@ -62,6 +62,21 @@ const RELOAD_CLIENT_JS = [
 
 const RELOAD_SCRIPT_TAG = '<script src="' + SSE_SCRIPT_PATH + '"></script>';
 
+/**
+ * Served when a project has no favicon of its own. Browsers request
+ * /favicon.ico on every load; without this the console shows a 404
+ * error on every project. A tiny robot face keeps it friendly.
+ */
+const FALLBACK_FAVICON_SVG = [
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">',
+  '<rect x="2" y="3" width="12" height="10" rx="2" fill="#7fd4ff"/>',
+  '<rect x="4.5" y="6" width="2.5" height="2.5" rx="0.5" fill="#101326"/>',
+  '<rect x="9" y="6" width="2.5" height="2.5" rx="0.5" fill="#101326"/>',
+  '<rect x="5" y="10" width="6" height="1.5" rx="0.75" fill="#101326"/>',
+  '<rect x="7.25" y="1" width="1.5" height="2" fill="#7fd4ff"/>',
+  '</svg>',
+].join('');
+
 /** Friendly 404 page. No outside files. A tiny text robot keeps it warm. */
 const NOT_FOUND_HTML = `<!doctype html>
 <html lang="en">
@@ -318,6 +333,11 @@ export async function startPreview(
       const target = resolveSafe(projectRoot, decoded);
       if (target === null) {
         sendNotFound(res, headOnly);
+        return;
+      }
+      // Built-in favicon fallback so every project load stays error free.
+      if (decoded === '/favicon.ico' && !fs.existsSync(target)) {
+        sendText(res, 200, 'image/svg+xml', FALLBACK_FAVICON_SVG, headOnly);
         return;
       }
       await serveFile(res, target, headOnly);

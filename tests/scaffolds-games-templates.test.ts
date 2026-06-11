@@ -9,7 +9,8 @@ import gamesScaffold from '../src/projects/scaffolds/games.js';
 import bigGamesScaffold from '../src/projects/scaffolds/biggames.js';
 
 const PRETTY = 'Star Catcher';
-const DASHES = /[‐‑‒–—―−]/;
+// U+2010 through U+2015 (hyphen to horizontal bar) plus U+2212 (minus sign).
+const DASHES = /[\u2010-\u2015\u2212]/;
 const PLACEHOLDERS = ['{{', '}}', '${', 'TODO', 'FIXME', 'XXX'];
 
 const scaffolds: ScaffoldDef[] = [gamesScaffold, bigGamesScaffold];

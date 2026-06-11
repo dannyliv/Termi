@@ -153,6 +153,7 @@ export function usageNote(
     '  1. A safety check on the message.',
     '  2. The build call that writes code.',
     '  3. A safety check on the answer.',
+    'Each file the AI changes adds one more safety check.',
   ];
   if (freeModeration) {
     lines.push('Safety checks here use a free checker. They do not use your plan.');

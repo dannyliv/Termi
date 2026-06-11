@@ -229,6 +229,30 @@ describe('path traversal and protected files', () => {
   });
 });
 
+describe('favicon fallback', () => {
+  it('serves a built-in svg favicon when the project has none', async () => {
+    const res = await httpGet(port, '/favicon.ico');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('image/svg+xml');
+    expect(res.body).toContain('<svg');
+    expect(res.headers['content-security-policy']).toBe(EXPECTED_CSP);
+  });
+
+  it('serves the project favicon when one exists', async () => {
+    const iconDir = await mkdtemp(path.join(os.tmpdir(), 'termi-favicon-'));
+    await writeFile(path.join(iconDir, 'favicon.ico'), 'real-icon-bytes', 'utf-8');
+    const own = await startOnFreePort(iconDir);
+    try {
+      const res = await httpGet(own.port, '/favicon.ico');
+      expect(res.status).toBe(200);
+      expect(res.body).toBe('real-icon-bytes');
+    } finally {
+      await own.stop();
+      await rm(iconDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('friendly 404 page', () => {
   it('shows a kind page with the text robot and full headers', async () => {
     const res = await httpGet(port, '/missing-page.html');

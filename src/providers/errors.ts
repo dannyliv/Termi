@@ -4,7 +4,7 @@
  * never echoed to the kid; describeForKid only returns T registry copy.
  */
 
-import { APICallError } from 'ai';
+import { APICallError, RetryError } from 'ai';
 import type { ProviderError } from '../types.js';
 import { formatResetTime } from '../ui/errors.js';
 import { T } from '../ui/text.js';
@@ -174,6 +174,11 @@ function fromStatus(status: number, get: HeaderGetter): ProviderError {
 export function classifyProviderError(err: unknown): ProviderError {
   if (isProviderError(err)) {
     return err;
+  }
+  // The AI SDK wraps the real failure in a RetryError once retries run out.
+  // Classify the last underlying error so a 429 still shows the quota screen.
+  if (RetryError.isInstance(err) && err.lastError !== undefined) {
+    return classifyProviderError(err.lastError);
   }
   if (APICallError.isInstance(err)) {
     if (err.statusCode !== undefined) {
