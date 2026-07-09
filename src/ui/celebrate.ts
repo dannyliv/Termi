@@ -53,6 +53,12 @@ export const BADGES: readonly BadgeDef[] = [
     hint: 'Make five projects.',
   },
   {
+    id: 'quest-hero',
+    label: 'Quest Hero',
+    emoji: '\u{1F5FA}',
+    hint: 'Finish a build quest with /quest.',
+  },
+  {
     id: 'learn-1',
     label: 'AI Spotter',
     emoji: '\u{1F916}',

@@ -20,6 +20,7 @@ export const COMMAND_NAMES = [
   'ideas',
   'badges',
   'learn',
+  'quest',
   'help',
   'done',
   'quit',
@@ -37,6 +38,7 @@ export const BARE_WORDS: readonly CommandName[] = [
   'preview',
   'badges',
   'learn',
+  'quest',
   'quit',
 ];
 
@@ -128,6 +130,7 @@ export function helpText(): string {
     ['/ideas', 'get fun ideas'],
     ['/badges', 'see your badges'],
     ['/learn', 'play short AI lessons'],
+    ['/quest', 'build with me, step by step'],
     ['/help', 'show this list'],
     ['/done', 'finish and celebrate'],
     ['/quit', 'stop for today'],

@@ -11,6 +11,7 @@ describe('kid copy registry', () => {
         'home',
         'wizard',
         'chat',
+        'quest',
         'blocks',
         'selfHarmSupport',
         'errors',

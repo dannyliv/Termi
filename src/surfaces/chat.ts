@@ -33,6 +33,7 @@ import type {
 } from '../types.js';
 import type { ProjectContext } from '../projects/store.js';
 import type { TurnResult } from '../agent/loop.js';
+import { questsFor, questStepLine, type QuestDef } from '../projects/quests.js';
 import { providerLabel } from '../setup/wizard.js';
 import {
   executeDone,
@@ -211,10 +212,10 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
   let prevTurnErrored = false;
   let turnsTaken = 0;
 
-  const doTurn = async (kidMessage: string): Promise<void> => {
+  const doTurn = async (kidMessage: string): Promise<'ok' | 'blocked' | 'error' | 'offline'> => {
     if (provider === null || runTurnFn === null) {
       say(offlineScreen());
-      return;
+      return 'offline';
     }
     const started = Date.now();
     let heartbeatCleared = false;
@@ -259,7 +260,7 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
       }
       say(renderProviderError(classifyProviderError(err), activeLabel));
       prevTurnErrored = true;
-      return;
+      return 'error';
     }
     clearInterval(beat);
     if (!heartbeatCleared) {
@@ -285,7 +286,7 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
         await awardBadge('bug-squasher');
       }
       prevTurnErrored = false;
-      return;
+      return 'ok';
     }
 
     if (result.status === 'blocked') {
@@ -301,12 +302,13 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
       } else {
         say([mascot('gentleNo'), '', T.blocks.generic].join('\n'));
       }
-      return;
+      return 'blocked';
     }
 
     const error: ProviderError = result.error ?? { kind: 'server' };
     say(renderProviderError(error, activeLabel));
     prevTurnErrored = true;
+    return 'error';
   };
 
   const finish = async (): Promise<void> => {
@@ -328,22 +330,85 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
   };
 
   p.log.message(style.dim(T.chat.doneHint));
+  if (questsFor(project.meta.scaffoldId).length > 0) {
+    p.log.message(style.dim(T.quest.hint));
+  }
+
+  let quest: QuestDef | null = null;
+  let questStep = 0;
+  const questAdvance = async (): Promise<void> => {
+    if (quest === null) {
+      return;
+    }
+    questStep += 1;
+    if (questStep >= quest.steps.length) {
+      quest = null;
+      say(style.title(T.quest.finished));
+      await awardBadge('quest-hero');
+    } else {
+      say(style.dim(T.quest.stepDone));
+    }
+  };
+
   let hintIndex = 0;
   for (;;) {
     const hint = T.hints[hintIndex % T.hints.length] ?? '';
     hintIndex += 1;
-    const raw = await p.text({ message: T.chat.placeholder, placeholder: hint });
+    const step = quest !== null ? quest.steps[questStep] : undefined;
+    if (quest !== null && step !== undefined) {
+      say(style.title(questStepLine(quest, questStep)));
+      say(style.dim(T.quest.enterToSend.replace('{prompt}', step.prompt)));
+    }
+    const raw = await p.text({
+      message: T.chat.placeholder,
+      placeholder: step !== undefined ? step.prompt : hint,
+    });
     if (p.isCancel(raw)) {
       await finish();
       return 'quit';
     }
     const cmd = parseCommand(raw);
     switch (cmd.kind) {
-      case 'chat':
-        if (cmd.text.length > 0) {
-          await doTurn(cmd.text);
+      case 'chat': {
+        // In a quest, plain Enter sends the suggested step prompt.
+        const text = cmd.text.length > 0 ? cmd.text : (step?.prompt ?? '');
+        if (text.length > 0) {
+          const outcome = await doTurn(text);
+          if (outcome === 'ok') {
+            await questAdvance();
+          }
         }
         break;
+      }
+      case 'quest': {
+        if (quest !== null) {
+          quest = null;
+          say(T.quest.stopped);
+          break;
+        }
+        const available = questsFor(project.meta.scaffoldId);
+        if (available.length === 0) {
+          say(T.quest.none);
+          break;
+        }
+        if (available.length === 1) {
+          quest = available[0] ?? null;
+        } else {
+          const picked = await p.select<string>({
+            message: T.quest.pick,
+            options: available.map((q) => ({ value: q.id, label: `${q.emoji} ${q.title}` })),
+          });
+          if (p.isCancel(picked)) {
+            break;
+          }
+          quest = available.find((q) => q.id === picked) ?? null;
+        }
+        if (quest !== null) {
+          questStep = 0;
+          say(T.quest.start);
+        }
+        break;
+      }
       case 'undo':
         executeUndo(snapshots, preview, say);
         break;

@@ -7,7 +7,7 @@ describe('getIdeas', () => {
     it(`has a curated list for ${scaffold.id}`, () => {
       const ideas = getIdeas(scaffold.id);
       expect(ideas.length).toBeGreaterThanOrEqual(8);
-      expect(ideas.length).toBeLessThanOrEqual(10);
+      expect(ideas.length).toBeLessThanOrEqual(16);
       for (const idea of ideas) {
         expect(typeof idea).toBe('string');
         expect(idea.trim().length).toBeGreaterThan(0);
@@ -18,7 +18,7 @@ describe('getIdeas', () => {
   it('falls back to a generic list for unknown ids', () => {
     const ideas = getIdeas('mystery-scaffold');
     expect(ideas.length).toBeGreaterThanOrEqual(8);
-    expect(ideas.length).toBeLessThanOrEqual(10);
+    expect(ideas.length).toBeLessThanOrEqual(12);
     expect(getIdeas('')).toEqual(ideas);
   });
 

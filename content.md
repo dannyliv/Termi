@@ -189,7 +189,13 @@ src/
                            memory (recap), listing and lookup.
     snapshots.ts           Content-addressed undo/redo snapshots under
                            TERMI_HOME/snapshots/<slug>/. Kid files only.
-    ideas.ts               Rotating prompt-idea decks per category.
+    ideas.ts               Rotating prompt-idea decks per category (15 each
+                           plus generic fallbacks).
+    quests.ts              Build Quests: one step-by-step guided build per
+                           scaffold (5 steps: kid instruction + ready prompt).
+                           Pure registry + questsFor/questById/questStepLine.
+                           Quest prompts go through the normal chat turn, so
+                           the full safety pipeline applies.
     scaffolds/             Nine scaffold modules: games (canvas), biggames
                            (vendored KAPLAY engine), art, music, pets, stories,
                            quizzes, websites, characters. index.ts is the
@@ -204,9 +210,14 @@ src/
   surfaces/
     home.ts                The landing screen (continue project, new, learn...).
     chat.ts                The chat loop UI: slash commands /preview /undo /redo
-                           /new /ideas /badges /learn /help /done /quit
+                           /new /ideas /badges /learn /quest /help /done /quit
                            /grownups. The typewriter reveal is capped at 1.5s
                            total. xai availability requires the parent ack.
+                           Quest mode: /quest starts the scaffold's guided
+                           build; each step prints its header and ready
+                           prompt, plain Enter sends the suggested prompt,
+                           steps advance only on an ok turn, finishing awards
+                           the quest-hero badge, /quest again pauses.
     commands.ts            Slash command parsing and help table. quit works as
                            a bare word, and exit/stop/bye/leave map to it so a
                            goodbye never becomes a paid AI turn.
@@ -241,8 +252,8 @@ src/
                            mascot with ASCII fallback), banner.ts, celebrate.ts,
                            text.ts (wrapping, kid copy helpers), errors.ts
                            (kid-safe error screens).
-tests/                     46 vitest files plus 3 shared helpers (agent-fakes.ts,
-                           safety-corpus.ts, ui-fk.ts). 1005 tests. Naming:
+tests/                     47 vitest files plus 3 shared helpers (agent-fakes.ts,
+                           safety-corpus.ts, ui-fk.ts). 1015 tests. Naming:
                            <area>-<module>.test.ts.
 .github/workflows/ci.yml   Matrix: ubuntu, macos, windows x Node 20, 22.
 ```
@@ -294,7 +305,7 @@ fallback).
 ```bash
 npm install
 npm run build        # tsc + copy vendored assets into dist/
-npm test             # vitest run (1005 tests, no network, no real HOME)
+npm test             # vitest run (1015 tests, no network, no real HOME)
 npm run typecheck    # src/ only; tests/ are excluded from tsconfig
 npm link && termi    # try the CLI locally
 ```
@@ -334,6 +345,12 @@ does it: the client factory checks settings.xaiParentAck).
 **New lesson.** Add to `learn/lessons.ts` following the existing shape (scripted
 steps, no model calls), give it the next badge id, and extend
 `tests/learn-lessons.test.ts`.
+
+**New quest.** Add a `QuestDef` to `src/projects/quests.ts` (3 to 6 steps,
+each step a kid-voice `say` plus a ready `prompt`). Termi's voice (title and
+say) must pass the reading-level bar; prompts follow the /ideas convention
+(15 words max, dash free). `tests/projects-quests.test.ts` enforces all of
+it, including that every scaffold keeps at least one quest.
 
 **New safety category.** Add to `safety/taxonomy.ts`, give it a block screen in
 `safety/blocks.ts`, extend the classifier prompt carefully (it has a 1,200 char

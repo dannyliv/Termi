@@ -244,3 +244,14 @@ describe('new kid copy quality', () => {
     }
   });
 });
+
+describe('quest command', () => {
+  it('parses /quest and the bare word', () => {
+    expect(parseCommand('/quest')).toEqual({ kind: 'quest' });
+    expect(parseCommand('quest')).toEqual({ kind: 'quest' });
+  });
+
+  it('shows /quest in the help list', () => {
+    expect(helpText()).toContain('/quest');
+  });
+});

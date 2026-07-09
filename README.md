@@ -8,6 +8,8 @@ You can make dodge games, platform games, pixel art, dance music, virtual pets, 
 
 Termi is a computer program, an AI tool. It is not a person. A grown-up sets it up first.
 
+Not sure what to say first? Type `/quest` inside any project. Termi walks you through a real build, step by step, with a ready idea at every step. Press Enter to use it, or type your own. Finish a quest and you earn the Quest Hero badge.
+
 Want to get good at building with AI? Type `termi learn`. Six short lessons teach you how to be the boss of your AI helper. Each one earns a badge, and you can replay them any time.
 
 Ready? Ask a grown-up to read the next part.
@@ -56,6 +58,8 @@ Run `termi`. The first run starts a setup wizard for a parent or guardian. It ta
 
 If you skip the provider step, Termi runs in offline mode: your kid can still create projects, play them in the preview, undo changes, and browse ideas. The chat shows a kind "ask a grown-up to set up the AI helper" screen.
 
+**If your kid does not know where to start:** every project type has a Build Quest (`/quest` in the chat), a five-step guided build with a ready prompt at each step, and a large idea deck (`/ideas`). Quest steps go through the same safety pipeline as any other message.
+
 ### Commands
 
 | Command | What it does |
@@ -81,12 +85,13 @@ Inside the build chat, these slash commands work:
 | `/ideas` | Get fun ideas. |
 | `/badges` | See earned badges. |
 | `/learn` | Play the short AI lessons. |
+| `/quest` | A step-by-step build guide with a ready prompt at each step. |
 | `/help` | Show this list. |
 | `/done` | Finish and celebrate. |
 | `/quit` | Stop for today. Projects are saved. |
 | `/grownups` | Grown-up zone, PIN required. |
 
-Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, `badges`, `learn`, and `quit` work on their own, no slash needed, and `exit`, `stop`, `bye`, and `leave` also quit. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
+Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, `badges`, `learn`, `quest`, and `quit` work on their own, no slash needed, and `exit`, `stop`, `bye`, and `leave` also quit. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
 
 In the grown-up zone you can add, switch, or remove providers, change the safety level, pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives. Removing a provider deletes its saved key or sign-in from this computer.
 

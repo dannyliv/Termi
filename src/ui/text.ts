@@ -70,6 +70,17 @@ export const T = {
     piiReminder: 'Quick tip: keep your real name and address secret online. I hid that part for you.',
   },
 
+  quest: {
+    hint: 'New here? Type /quest and we build together, step by step.',
+    pick: 'Pick a quest.',
+    none: 'No quest for this project type yet. Try /ideas instead.',
+    start: 'Quest time! Press Enter on a step to send my idea, or type your own.',
+    enterToSend: 'Press Enter to send: "{prompt}"',
+    stepDone: 'Step done! On to the next one.',
+    stopped: 'Quest paused. Type /quest to jump back in.',
+    finished: 'You finished the whole quest! Look how much you built.',
+  },
+
   blocks: {
     byCategory: blockByCategory,
     generic: 'I cannot help with that one. Try saying it a new way?',
@@ -129,6 +140,7 @@ export const T = {
   hints: [
     'Type /preview to watch your project run.',
     'Type /undo to take back the last change.',
+    'Type /quest to build step by step.',
     'Type /ideas if you feel stuck.',
     'Type /badges to see what you earned.',
     'Type /help to see every command.',
