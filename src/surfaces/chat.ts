@@ -52,6 +52,8 @@ export type ChatExit = 'quit' | 'new';
 const HEARTBEAT_MS = 3500;
 /** Per-character delay for the typewriter reveal. */
 const TYPE_DELAY_MS = 12;
+/** Ceiling on the whole reveal, so long replies never feel slow. */
+const TYPE_TOTAL_BUDGET_MS = 1500;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -66,13 +68,16 @@ export async function typewriter(
   write: (chunk: string) => void = (chunk) => void process.stdout.write(chunk),
   delayMs: number = TYPE_DELAY_MS,
 ): Promise<void> {
-  if (process.env.TERMI_FAST_TEXT === '1' || delayMs <= 0) {
+  // The reveal never exceeds the total budget: long replies speed up and
+  // print instantly once the per-character delay rounds down to zero.
+  const perChar = Math.min(delayMs, Math.floor(TYPE_TOTAL_BUDGET_MS / Math.max(1, text.length)));
+  if (process.env.TERMI_FAST_TEXT === '1' || perChar <= 0) {
     write(`${text}\n`);
     return;
   }
   for (const ch of text) {
     write(ch);
-    await sleep(delayMs);
+    await sleep(perChar);
   }
   write('\n');
 }
@@ -94,12 +99,13 @@ function mascotExpressionFrom(name: string): MascotExpression {
   return (known as readonly string[]).includes(name) ? (name as MascotExpression) : 'gentleNo';
 }
 
-function providerAvailability(): ClassifierAvailability {
+function providerAvailability(settings: Settings): ClassifierAvailability {
   return {
     'openai-chatgpt': hasTokens(),
     'openai-api': (getSecret('api-key-openai-api') ?? '').length > 0,
     anthropic: (getSecret('api-key-anthropic') ?? '').length > 0,
-    xai: (getSecret('api-key-xai') ?? '').length > 0,
+    // A Grok key only counts once a parent confirmed the adults-only terms.
+    xai: (getSecret('api-key-xai') ?? '').length > 0 && settings.xaiParentAck,
   };
 }
 
@@ -148,7 +154,7 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
       provider = null;
     }
   }
-  const backend = pickClassifierBackend(settings, providerAvailability());
+  const backend = pickClassifierBackend(settings, providerAvailability(settings));
   const safety = createSafetyPipeline({
     classifierModel: () =>
       backend.classifierClient !== null
@@ -380,6 +386,10 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
       case 'new':
         await finish();
         return 'new';
+      case 'quit':
+        say(T.errors.goodbye);
+        await finish();
+        return 'quit';
       case 'grownups':
         try {
           const panel = await import('../grownups/panel.js');

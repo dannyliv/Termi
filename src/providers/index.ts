@@ -34,6 +34,12 @@ export interface ProviderDeps {
    * OpenAI platform API calls. Defaults to the saved settings value.
    */
   installId?: string | null;
+  /**
+   * Overrides the saved xaiParentAck settings flag. The xai client only
+   * builds when a parent has confirmed the adults-only acknowledgment,
+   * even if a key exists in the keychain.
+   */
+  xaiParentAck?: boolean;
 }
 
 function isSystemLikeMessage(item: unknown): boolean {
@@ -260,16 +266,18 @@ export function createProviderClient(
       if (key === null || key.length === 0) {
         throw new Error('provider-not-configured:openai-api');
       }
-      const getInstallId = (): string | null => {
-        if (deps.installId !== undefined) {
-          return deps.installId;
-        }
+      // Resolved once per client, not per request: the id never changes
+      // mid-session and loadSettings costs a disk read plus an HMAC check.
+      let resolvedInstallId: string | null;
+      if (deps.installId !== undefined) {
+        resolvedInstallId = deps.installId;
+      } else {
         const id = loadSettings().settings.installId;
-        return id.length > 0 ? id : null;
-      };
+        resolvedInstallId = id.length > 0 ? id : null;
+      }
       const provider = createOpenAI({
         apiKey: key,
-        fetch: makeSafetyIdFetch(getInstallId, fetchImpl ?? globalThis.fetch),
+        fetch: makeSafetyIdFetch(() => resolvedInstallId, fetchImpl ?? globalThis.fetch),
       });
       return {
         id: providerId,
@@ -297,6 +305,13 @@ export function createProviderClient(
     case 'xai': {
       const key = readSecret('api-key-xai');
       if (key === null || key.length === 0) {
+        throw new Error('provider-not-configured:xai');
+      }
+      // The adults-only acknowledgment is enforced here, not only in the
+      // wizard UI: a key dropped into the keychain by any other path still
+      // refuses to run until a parent has confirmed.
+      const ack = deps.xaiParentAck ?? loadSettings().settings.xaiParentAck;
+      if (!ack) {
         throw new Error('provider-not-configured:xai');
       }
       const provider = createXai({
@@ -331,11 +346,30 @@ function safeCreate(providerId: ProviderId, deps: ProviderDeps): ProviderClient 
   }
 }
 
+/** First prompted-classifier client that builds, in preference order. */
+function promptedClassifierClient(
+  availability: ClassifierAvailability,
+  deps: ProviderDeps,
+): ProviderClient | null {
+  const order: ProviderId[] = ['anthropic', 'openai-chatgpt', 'xai'];
+  for (const id of order) {
+    if (availability[id]) {
+      const client = safeCreate(id, deps);
+      if (client !== null) {
+        return client;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Picks the safety classifier backend, independent of the active main
  * provider. Preference order: OpenAI moderation (any platform key,
  * including a minted one), then Anthropic haiku, then the ChatGPT mini
- * on quota, then xAI as the last resort.
+ * on quota, then xAI as the last resort. When the moderation key exists
+ * but the openai-api client will not build, the prompted kid-check falls
+ * through the same chain so grooming, pii, and jailbreak stay covered.
  */
 export function pickClassifierBackend(
   settings: Settings,
@@ -346,25 +380,9 @@ export function pickClassifierBackend(
   const readSecret = deps.readSecret ?? getSecret;
   const moderationKey = moderationKeyAccessor(readSecret);
   if (moderationKey !== null) {
-    return { moderationKey, classifierClient: safeCreate('openai-api', deps) };
+    const client =
+      safeCreate('openai-api', deps) ?? promptedClassifierClient(availability, deps);
+    return { moderationKey, classifierClient: client };
   }
-  if (availability.anthropic) {
-    const client = safeCreate('anthropic', deps);
-    if (client !== null) {
-      return { moderationKey: null, classifierClient: client };
-    }
-  }
-  if (availability['openai-chatgpt']) {
-    const client = safeCreate('openai-chatgpt', deps);
-    if (client !== null) {
-      return { moderationKey: null, classifierClient: client };
-    }
-  }
-  if (availability.xai) {
-    const client = safeCreate('xai', deps);
-    if (client !== null) {
-      return { moderationKey: null, classifierClient: client };
-    }
-  }
-  return { moderationKey: null, classifierClient: null };
+  return { moderationKey: null, classifierClient: promptedClassifierClient(availability, deps) };
 }

@@ -10,6 +10,8 @@ import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
+import { hasProfanity } from '../safety/prefilter.js';
+import { TRUNCATION_NOTE } from '../safety/textextract.js';
 import type { ClassifierVerdict } from '../types.js';
 import type { TurnDeps } from './loop.js';
 
@@ -23,6 +25,9 @@ export const FILE_SIZE_CAP_BYTES = 256 * 1024;
 const BLOCKED = 'blocked: Termi cannot make that change. Try asking another way.';
 const OUTSIDE = 'outside-project: Termi can only touch files inside this project.';
 const TOO_LARGE = 'too-large: that file would be too big. Keep files smaller.';
+const TOO_WORDY =
+  'too-wordy: that file has more text than the safety check can read. Split it into smaller files.';
+const BAD_NAME = 'bad-name: that file name is not okay. Pick a friendlier name.';
 const FILE_CAP_MSG = `file-cap: this project already has ${KID_FILE_CAP} files. Change one instead.`;
 const NOTES_HINT = 'blocked: use update_project_notes to change the project notes.';
 const READ_TRUNCATION_NOTE = '\n[cut: this file is longer than 8 KB. This is the start.]';
@@ -172,6 +177,11 @@ export function createAgentTools(
     if (normalized === null) {
       return OUTSIDE;
     }
+    // File names show on screen and land on disk: screen them like content.
+    if (hasProfanity(normalized.replace(/[-_./\\]/g, ' '))) {
+      auditCodescanBlock(normalized, ['file name']);
+      return BAD_NAME;
+    }
     if (isTermiMd(normalized)) {
       return NOTES_HINT;
     }
@@ -189,8 +199,13 @@ export function createAgentTools(
       return BLOCKED;
     }
     const visible = deps.safety.extractVisibleText(normalized, content);
+    // Fail closed on overflow: text past the extraction cap would reach the
+    // kid without ever being judged, so the write is refused instead.
+    if (visible.includes(TRUNCATION_NOTE)) {
+      return TOO_WORDY;
+    }
     // The pipeline fails closed and audits its own blocks.
-    const verdict = await deps.safety.checkOutputText(visible, deps.session);
+    const verdict = await deps.safety.checkOutputText(visible, deps.session, 'file');
     if (!verdict.allowed) {
       return BLOCKED;
     }
@@ -322,7 +337,7 @@ export function createAgentTools(
             .filter((part): part is string => part !== undefined)
             .join('\n');
           // Prose fields are model output headed for disk: classify before saving.
-          const verdict = await deps.safety.checkOutputText(prose, deps.session);
+          const verdict = await deps.safety.checkOutputText(prose, deps.session, 'file');
           if (!verdict.allowed) {
             return BLOCKED;
           }

@@ -11,6 +11,7 @@
  * - Without one: a single prompted classifier covers the full taxonomy.
  */
 
+import { createHash } from 'node:crypto';
 import { streamText, type LanguageModel } from 'ai';
 import type {
   AuditEvent,
@@ -42,8 +43,16 @@ import { extractVisibleText } from './textextract.js';
 export const DEFAULT_TIMEOUT_MS = 8000;
 const MODERATION_URL = 'https://api.openai.com/v1/moderations';
 const MODERATION_MODEL = 'omni-moderation-latest';
-/** Cap on judged text included in a prompted check (token efficiency). */
-const JUDGE_TEXT_CAP = 2000;
+/** Chars of judged text per prompted-check call (token efficiency). */
+export const JUDGE_TEXT_CAP = 2000;
+/**
+ * Verdict budget for one prompted check. Reasoning models spend thinking
+ * tokens from this budget before any visible text; too small a cap starves
+ * the verdict, which fails closed and blocks everything. Keep it roomy.
+ */
+export const CLASSIFIER_MAX_OUTPUT_TOKENS = 600;
+/** Most allow verdicts remembered per session for unchanged file text. */
+const FILE_VERDICT_CACHE_CAP = 200;
 
 export interface SafetyPipelineDeps {
   /** AI SDK LanguageModel for prompted checks, or null when unavailable. */
@@ -133,6 +142,10 @@ async function moderationCheck(
   if (!scores || typeof scores !== 'object') {
     throw new Error('moderation response malformed');
   }
+  // An empty or unrecognized scores object must not read as "all clear".
+  if (!MODERATION_CUTOFFS.some((cutoff) => typeof scores[cutoff.score] === 'number')) {
+    throw new Error('moderation response malformed');
+  }
   const categories: SafetyCategory[] = [];
   let severity: 0 | 1 | 2 | 3 = 0;
   let selfHarmConcern = false;
@@ -172,7 +185,7 @@ async function promptedCheck(
     model,
     prompt: buildClassifierPrompt(direction, composedWindow, scope),
     temperature: 0,
-    maxOutputTokens: 150,
+    maxOutputTokens: CLASSIFIER_MAX_OUTPUT_TOKENS,
     onError: ({ error }) => {
       if (streamError === null) {
         streamError = error;
@@ -191,9 +204,33 @@ async function promptedCheck(
   return parseVerdict(text);
 }
 
+/**
+ * Judged text is data. Braces are swapped for parentheses before the text
+ * enters a classifier prompt, so an echo of judged content can never form
+ * the JSON object that parseVerdict looks for (verdict forgery).
+ */
+function neutralizeJudged(text: string): string {
+  return text.replace(/\{/g, '(').replace(/\}/g, ')');
+}
+
+/** Splits normalized judged text into prompt-sized chunks (at least one). */
+function judgeChunks(normalized: string): string[] {
+  if (normalized.length <= JUDGE_TEXT_CAP) {
+    return [normalized];
+  }
+  const chunks: string[] = [];
+  for (let i = 0; i < normalized.length; i += JUDGE_TEXT_CAP) {
+    chunks.push(normalized.slice(i, i + JUDGE_TEXT_CAP));
+  }
+  return chunks;
+}
+
 export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const fetchImpl = deps.fetchImpl ?? globalThis.fetch;
+  // Session-scoped allow cache for file text: the same visible text is never
+  // re-judged remotely twice. Blocks and failures are never cached.
+  const fileAllowCache = new Set<string>();
 
   function auditVerdict(
     verdict: ClassifierVerdict,
@@ -219,21 +256,43 @@ export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {
     direction: 'input' | 'output',
     text: string,
     state: SessionSafetyState,
+    source: 'chat' | 'file',
   ): Promise<ClassifierVerdict> {
     try {
-      const normalized = normalizeText(text).slice(0, JUDGE_TEXT_CAP);
-      const composedWindow = `${windowText(state)}\nTEXT TO JUDGE:\n${normalized}`;
+      const normalized = normalizeText(text);
+      const cacheKey =
+        source === 'file'
+          ? createHash('sha256').update(normalized).digest('hex')
+          : null;
+      if (cacheKey !== null && fileAllowCache.has(cacheKey)) {
+        return {
+          allowed: true,
+          categories: [],
+          severity: 0,
+          selfHarmConcern: false,
+          failClosed: false,
+          kidMessage: null,
+        };
+      }
+
+      // Every chunk of the judged text gets its own prompted check, so
+      // nothing past the per-call cap goes unjudged. Braces in judged text
+      // are neutralized so an echo cannot forge a verdict.
+      const window = neutralizeJudged(windowText(state));
+      const chunks = judgeChunks(neutralizeJudged(normalized));
 
       const tasks: Promise<ClassifierVerdict>[] = [];
       const key = deps.moderationKey();
       const model = deps.classifierModel() as LanguageModel | null;
       if (key) {
         tasks.push(withTimeout(moderationCheck(key, text, fetchImpl), timeoutMs));
-        if (model) {
-          tasks.push(withTimeout(promptedCheck(model, direction, composedWindow, 'kidcheck'), timeoutMs));
+      }
+      if (model) {
+        const scope = key ? 'kidcheck' : 'full';
+        for (const chunk of chunks) {
+          const composedWindow = `${window}\nTEXT TO JUDGE:\n${chunk}`;
+          tasks.push(withTimeout(promptedCheck(model, direction, composedWindow, scope), timeoutMs));
         }
-      } else if (model) {
-        tasks.push(withTimeout(promptedCheck(model, direction, composedWindow, 'full'), timeoutMs));
       }
 
       let merged: ClassifierVerdict;
@@ -246,9 +305,13 @@ export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {
       }
 
       // Cross-turn grooming escalation off cumulative session counters.
-      bumpCounters(state, merged.categories, text);
+      // File text never bumps: counters track the conversation (what the
+      // kid types and what Termi says), not the kid's own game content.
+      if (source === 'chat') {
+        bumpCounters(state, merged.categories, text);
+      }
       let groomingFlag = false;
-      if (groomingEscalation(state)) {
+      if (source === 'chat' && groomingEscalation(state)) {
         groomingFlag = true;
         const categories: SafetyCategory[] = merged.categories.includes('grooming')
           ? merged.categories
@@ -261,6 +324,13 @@ export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {
           failClosed: merged.failClosed,
           kidMessage: blockMessage(categories),
         };
+      }
+
+      if (cacheKey !== null && merged.allowed && !merged.failClosed) {
+        if (fileAllowCache.size >= FILE_VERDICT_CACHE_CAP) {
+          fileAllowCache.clear();
+        }
+        fileAllowCache.add(cacheKey);
       }
 
       auditVerdict(merged, direction, text, groomingFlag);
@@ -303,10 +373,14 @@ export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {
       return prefilterContextImpl(text);
     },
     checkInput(text: string, s: SessionSafetyState): Promise<ClassifierVerdict> {
-      return check('input', text, s);
+      return check('input', text, s, 'chat');
     },
-    checkOutputText(text: string, s: SessionSafetyState): Promise<ClassifierVerdict> {
-      return check('output', text, s);
+    checkOutputText(
+      text: string,
+      s: SessionSafetyState,
+      source: 'reply' | 'file' = 'reply',
+    ): Promise<ClassifierVerdict> {
+      return check('output', text, s, source === 'file' ? 'file' : 'chat');
     },
     scanCode,
     extractVisibleText,

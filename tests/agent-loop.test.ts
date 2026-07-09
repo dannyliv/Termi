@@ -149,6 +149,17 @@ describe('runTurn input gate', () => {
     expect(model.doStreamCalls.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('records a blocked kid message into the grooming window', async () => {
+    const model = mockModel([textChunks('never shown')]);
+    const fake = makeDeps({ model });
+    fake.safety.inputVerdict = Promise.resolve(blockedVerdict('grooming'));
+    const result = await runTurn('what school do you go to', fake.deps);
+    expect(result.status).toBe('blocked');
+    expect(fake.deps.session.recentTurns).toHaveLength(1);
+    expect(fake.deps.session.recentTurns[0]?.role).toBe('kid');
+    expect(fake.deps.session.recentTurns[0]?.text).toContain('what school');
+  });
+
   it('fails closed when the input classifier itself breaks', async () => {
     const model = mockModel([textChunks('hello')]);
     const fake = makeDeps({ model });

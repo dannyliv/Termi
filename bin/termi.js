@@ -8,6 +8,13 @@ if (major < 20 || (major === 20 && minor < 19)) {
   console.error('');
   process.exit(1);
 }
+if (process.argv[2] === '--version' || process.argv[2] === '-v') {
+  // Answered here so a version check never loads (or depends on) the app.
+  const { createRequire } = await import('node:module');
+  const pkg = createRequire(import.meta.url)('../package.json');
+  console.log(pkg.version);
+  process.exit(0);
+}
 import(new URL('../dist/cli.js', import.meta.url)).catch((err) => {
   console.error('Termi could not start. Details were saved for a grown-up.');
   console.error(err && err.message ? err.message : err);

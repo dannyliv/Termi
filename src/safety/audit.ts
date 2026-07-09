@@ -12,7 +12,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { getSecret, setSecret } from '../auth/keychain.js';
-import { auditLogPath, ensureDirs } from '../config/paths.js';
+import { auditLogPath, ensureDirs, termiHome } from '../config/paths.js';
 import type { AuditEvent } from '../types.js';
 
 export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
@@ -24,14 +24,29 @@ export function rotatedAuditLogPath(): string {
   return `${auditLogPath()}.1`;
 }
 
+/**
+ * The key and the chain tip are cached between appends: without this,
+ * every audit event pays a keychain round trip plus a full read of the
+ * log just to find the last mac. Both caches self-invalidate when the
+ * state home or the file changes underneath them.
+ */
+let keyCache: { home: string; key: Buffer } | null = null;
+let tipCache: { file: string; size: number; mac: string } | null = null;
+
 /** Loads (or creates once) the shared HMAC key. */
 function hmacKey(): Buffer {
+  const home = termiHome();
+  if (keyCache !== null && keyCache.home === home) {
+    return keyCache.key;
+  }
   let hex = getSecret(HMAC_ACCOUNT);
   if (!hex) {
     hex = crypto.randomBytes(32).toString('hex');
     setSecret(HMAC_ACCOUNT, hex);
   }
-  return Buffer.from(hex, 'hex');
+  const key = Buffer.from(hex, 'hex');
+  keyCache = { home, key };
+  return key;
 }
 
 /** JSON with recursively sorted keys, so the MAC input is stable. */
@@ -127,8 +142,24 @@ export function appendAudit(event: AuditEvent, opts?: { maxBytes?: number }): vo
   const file = auditLogPath();
   const key = hmacKey();
   maybeRotate(file, key, opts?.maxBytes ?? AUDIT_MAX_BYTES);
-  const prevMac = lastMac(file) ?? GENESIS;
-  appendLine(file, { ...event }, prevMac, key);
+  let size = 0;
+  try {
+    size = fs.statSync(file).size;
+  } catch {
+    size = 0;
+  }
+  // The cached tip is only trusted while the file is exactly as we left
+  // it; any outside change falls back to reading the real last line.
+  const prevMac =
+    tipCache !== null && tipCache.file === file && tipCache.size === size && size > 0
+      ? tipCache.mac
+      : (lastMac(file) ?? GENESIS);
+  const mac = appendLine(file, { ...event }, prevMac, key);
+  try {
+    tipCache = { file, size: fs.statSync(file).size, mac };
+  } catch {
+    tipCache = null;
+  }
 }
 
 export interface ChainVerification {

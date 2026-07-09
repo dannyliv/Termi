@@ -120,7 +120,7 @@ export const T = {
   grownups: {
     pinPrompt: 'Grown-up check. Please type the PIN.',
     wrongPin: 'That PIN is not right. Try again.',
-    lockout: 'Too many tries. The lock opens in five minutes.',
+    lockout: 'Too many tries. The lock opens in {minutes} minutes.',
     needsGrownup: 'This part needs a grown-up. Please go get one.',
     needsAttention: 'Termi needs a grown-up to check something.',
     kidStop: 'This screen is for grown-ups. Ask one to help you here.',

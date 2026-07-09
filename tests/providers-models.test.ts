@@ -29,7 +29,7 @@ describe('model alias map', () => {
       },
       xai: {
         zippy: 'grok-4.3',
-        smart: 'grok-4.3',
+        smart: 'grok-4.5',
         classifier: 'grok-4.3',
       },
     });
@@ -61,6 +61,8 @@ describe('resolveModelId', () => {
     expect(resolveModelId('anthropic', 'main', 'zippy')).toBe('claude-sonnet-4-6');
     expect(resolveModelId('anthropic', 'main', 'smart')).toBe('claude-opus-4-8');
     expect(resolveModelId('openai-chatgpt', 'main', 'smart')).toBe('gpt-5.5');
+    expect(resolveModelId('xai', 'main', 'smart')).toBe('grok-4.5');
+    expect(resolveModelId('xai', 'main', 'zippy')).toBe('grok-4.3');
   });
 
   it('ignores the alias for the classifier role', () => {

@@ -13,6 +13,7 @@ import { setSecret } from '../auth/keychain.js';
 import { hasPin, markSetupComplete, setPin } from '../config/pin.js';
 import { defaultSettings, loadSettings, saveSettings } from '../config/settings.js';
 import { appendAudit } from '../safety/audit.js';
+import { nameIsOkay } from '../safety/prefilter.js';
 import { scaffoldById } from '../projects/scaffolds/index.js';
 import { renderBanner } from '../ui/banner.js';
 import { mascot } from '../ui/mascot.js';
@@ -113,7 +114,7 @@ function ensure<V>(value: V | symbol): V {
   return value as V;
 }
 
-const KEY_ACCOUNT: Record<Exclude<ProviderId, 'openai-chatgpt'>, string> = {
+export const KEY_ACCOUNT: Record<Exclude<ProviderId, 'openai-chatgpt'>, string> = {
   'openai-api': 'api-key-openai-api',
   anthropic: 'api-key-anthropic',
   xai: 'api-key-xai',
@@ -196,7 +197,7 @@ async function addKeyProvider(
   settings: Settings,
 ): Promise<Settings | null> {
   let next = { ...settings };
-  if (id === 'xai') {
+  if (id === 'xai' && !next.xaiParentAck) {
     const agreed = await p.confirm({
       message: `${T.wizard.xaiAck} Do you confirm this?`,
       initialValue: false,
@@ -205,26 +206,38 @@ async function addKeyProvider(
       bail();
     }
     if (!grokKeyAllowed(agreed === true)) {
-      p.log.info('Skipped Grok. You can add it later from the grown-up zone.');
+      p.log.info('Skipped Grok. Pick another helper, or add Grok later.');
       return null;
     }
     next = { ...next, xaiParentAck: true };
     audit('settings_change', 'xai parent ack confirmed');
   }
-  const key = ensure(
-    await p.password({
-      message: `Paste the ${providerLabel(id)} now.`,
-      validate: (value) => (value && value.trim().length > 0 ? undefined : 'The key cannot be empty.'),
-    }),
-  ).trim();
-  setSecret(KEY_ACCOUNT[id], key);
-  const s = p.spinner();
-  s.start('Checking the key...');
-  const verdict = await validateApiKey(id, key);
-  if (verdict === 'bad') {
-    s.stop('That key did not work. You can change it in the grown-up zone.');
-  } else {
+  for (;;) {
+    const key = ensure(
+      await p.password({
+        message: `Paste the ${providerLabel(id)} now.`,
+        validate: (value) =>
+          value && value.trim().length > 0 ? undefined : 'The key cannot be empty.',
+      }),
+    ).trim();
+    const s = p.spinner();
+    s.start('Checking the key...');
+    const verdict = await validateApiKey(id, key);
+    if (verdict === 'bad') {
+      // A clearly rejected key is never saved or marked configured.
+      s.stop('That key did not work.');
+      const again = await p.confirm({ message: 'Try a different key?', initialValue: true });
+      if (p.isCancel(again)) {
+        bail();
+      }
+      if (again) {
+        continue;
+      }
+      return null;
+    }
+    setSecret(KEY_ACCOUNT[id], key);
     s.stop('Key saved.');
+    break;
   }
   audit('provider_change', `added ${id}`);
   const configured = next.configuredProviders.includes(id)
@@ -235,29 +248,36 @@ async function addKeyProvider(
 
 /**
  * One provider add flow, shared by the wizard and the grown-ups panel.
- * Returns updated settings, or null when skipped or unsuccessful.
+ * Returns updated settings, or null only when the parent picked Skip.
+ * A failed sign-in or a declined acknowledgment loops back to the picker,
+ * so the parent is never dead-ended out of the provider step.
  * Secrets persist immediately; the caller persists the settings.
  */
 export async function configureProvider(settings: Settings): Promise<Settings | null> {
-  const choice = await p.select<ProviderChoice>({
-    message: T.wizard.providerPick,
-    options: providerOptions().map((o) => ({
-      value: o.value,
-      label: o.label,
-      ...(o.hint !== undefined ? { hint: o.hint } : {}),
-    })),
-    initialValue: 'openai-chatgpt',
-  });
-  if (p.isCancel(choice)) {
-    bail();
+  for (;;) {
+    const choice = await p.select<ProviderChoice>({
+      message: T.wizard.providerPick,
+      options: providerOptions().map((o) => ({
+        value: o.value,
+        label: o.label,
+        ...(o.hint !== undefined ? { hint: o.hint } : {}),
+      })),
+      initialValue: 'openai-chatgpt',
+    });
+    if (p.isCancel(choice)) {
+      bail();
+    }
+    if (choice === 'skip') {
+      return null;
+    }
+    const updated =
+      choice === 'openai-chatgpt'
+        ? await addChatgptProvider(settings)
+        : await addKeyProvider(choice, settings);
+    if (updated !== null) {
+      return updated;
+    }
   }
-  if (choice === 'skip') {
-    return null;
-  }
-  if (choice === 'openai-chatgpt') {
-    return addChatgptProvider(settings);
-  }
-  return addKeyProvider(choice, settings);
 }
 
 async function createPinStep(): Promise<void> {
@@ -373,6 +393,7 @@ async function kidNicknameStep(settings: Settings): Promise<Settings> {
         const trimmed = (value ?? '').trim();
         if (trimmed.length === 0) return 'Pick any fun name. It cannot be empty.';
         if (trimmed.length > 24) return 'Keep it under 24 letters.';
+        if (!nameIsOkay(trimmed)) return 'That name will not work. Pick a made-up one.';
         return undefined;
       },
     }),
@@ -416,7 +437,12 @@ async function firstGameStep(settings: Settings): Promise<void> {
   if (namePick === CUSTOM) {
     const typed = await p.text({
       message: 'What is its name?',
-      validate: (value) => ((value ?? '').trim().length > 0 ? undefined : 'It needs a name.'),
+      validate: (value) => {
+        const trimmed = (value ?? '').trim();
+        if (trimmed.length === 0) return 'It needs a name.';
+        if (!nameIsOkay(trimmed)) return 'That name will not work. Try another one.';
+        return undefined;
+      },
     });
     if (p.isCancel(typed)) {
       return;

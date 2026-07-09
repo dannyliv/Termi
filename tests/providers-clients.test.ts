@@ -110,10 +110,21 @@ describe('createProviderClient', () => {
     expect(client.moderationEndpoint).toBe(true);
   });
 
-  it('builds an xai client', () => {
+  it('builds an xai client once the parent ack is confirmed', () => {
     setSecret('api-key-xai', 'xai-test');
-    const client = createProviderClient('xai');
+    const client = createProviderClient('xai', { xaiParentAck: true });
+    expect(client.moderationEndpoint).toBe(false);
     expect(modelIdOf(client.languageModel('main', 'zippy'))).toBe('grok-4.3');
+    expect(modelIdOf(client.languageModel('main', 'smart'))).toBe('grok-4.5');
+    expect(modelIdOf(client.languageModel('classifier', 'smart'))).toBe('grok-4.3');
+  });
+
+  it('refuses the xai client without the parent ack, even with a key', () => {
+    setSecret('api-key-xai', 'xai-test');
+    expect(() => createProviderClient('xai')).toThrow('provider-not-configured:xai');
+    expect(() => createProviderClient('xai', { xaiParentAck: false })).toThrow(
+      'provider-not-configured:xai',
+    );
   });
 
   it('throws when a provider is not configured', () => {
@@ -122,6 +133,7 @@ describe('createProviderClient', () => {
     expect(() => createProviderClient('openai-chatgpt')).toThrow(
       'provider-not-configured:openai-chatgpt',
     );
+    expect(() => createProviderClient('xai')).toThrow('provider-not-configured:xai');
   });
 });
 
@@ -191,9 +203,22 @@ describe('pickClassifierBackend preference order', () => {
 
   it('uses xai only as the last resort', () => {
     setSecret('api-key-xai', 'xai-key');
-    const picked = pickClassifierBackend(settings, { ...noAvailability, xai: true });
+    const picked = pickClassifierBackend(
+      settings,
+      { ...noAvailability, xai: true },
+      { xaiParentAck: true },
+    );
     expect(picked.moderationKey).toBeNull();
     expect(picked.classifierClient?.id).toBe('xai');
+    expect(modelIdOf(picked.classifierClient?.languageModel('classifier', 'zippy'))).toBe(
+      'grok-4.3',
+    );
+  });
+
+  it('never picks xai without the parent ack', () => {
+    setSecret('api-key-xai', 'xai-key');
+    const picked = pickClassifierBackend(settings, { ...noAvailability, xai: true });
+    expect(picked.classifierClient).toBeNull();
   });
 
   it('returns nulls when nothing is available', () => {
@@ -205,11 +230,15 @@ describe('pickClassifierBackend preference order', () => {
   it('ignores availability flags whose credentials are gone', () => {
     // anthropic flagged available but no key stored: skip to xai.
     setSecret('api-key-xai', 'xai-key');
-    const picked = pickClassifierBackend(settings, {
-      ...noAvailability,
-      anthropic: true,
-      xai: true,
-    });
+    const picked = pickClassifierBackend(
+      settings,
+      {
+        ...noAvailability,
+        anthropic: true,
+        xai: true,
+      },
+      { xaiParentAck: true },
+    );
     expect(picked.classifierClient?.id).toBe('xai');
   });
 });

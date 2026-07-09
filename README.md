@@ -30,17 +30,17 @@ If Node is too old, Termi prints a plain message with the download link instead 
 
 ### Install
 
-This is a private repository, so install from a clone:
+This is a private repository, so install from a clone (your GitHub account needs access to it):
 
 ```
-git clone git@github.com:dannyliv/Termi.git
+git clone https://github.com/dannyliv/Termi.git
 cd Termi
 npm install
 npm run build
 npm link
 ```
 
-After `npm link`, the `termi` command works from any folder. To remove it later, run `npm rm -g termi` (full cleanup steps are in SAFETY.md).
+After `npm link`, the `termi` command works from any folder. If `npm link` reports a permission error, prefix it with `sudo` on macOS and Linux, or run the terminal as administrator on Windows. To remove it later, run `npm rm -g termi` (full cleanup steps are in SAFETY.md).
 
 ### First run: the setup wizard
 
@@ -83,11 +83,12 @@ Inside the build chat, these slash commands work:
 | `/learn` | Play the short AI lessons. |
 | `/help` | Show this list. |
 | `/done` | Finish and celebrate. |
+| `/quit` | Stop for today. Projects are saved. |
 | `/grownups` | Grown-up zone, PIN required. |
 
-Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, `badges`, and `learn` work on their own, no slash needed. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
+Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, `badges`, `learn`, and `quit` work on their own, no slash needed, and `exit`, `stop`, `bye`, and `leave` also quit. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
 
-In the grown-up zone you can add or switch providers, change the safety level, pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives.
+In the grown-up zone you can add, switch, or remove providers, change the safety level, pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives. Removing a provider deletes its saved key or sign-in from this computer.
 
 ### The nine project types
 

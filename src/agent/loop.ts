@@ -208,6 +208,9 @@ export async function runTurn(kidMessage: string, deps: TurnDeps): Promise<TurnR
   // The input verdict outranks everything: on a block, discard the turn.
   const inputVerdict = await gate;
   if (!inputVerdict.allowed) {
+    // Blocked turns still enter the grooming window: the classifier must
+    // keep seeing the most suspicious messages in the recent-chat context.
+    recordTurn(deps.session, 'kid', kidText);
     return blockedResult(inputVerdict, filesChanged);
   }
 
@@ -224,8 +227,10 @@ export async function runTurn(kidMessage: string, deps: TurnDeps): Promise<TurnR
 
   // (4) Output classifier on the final reply. Writes that already landed
   // were each individually scanned and classified before disk.
-  const outputVerdict = await deps.safety.checkOutputText(replyText, deps.session);
+  const outputVerdict = await deps.safety.checkOutputText(replyText, deps.session, 'reply');
   if (!outputVerdict.allowed) {
+    recordTurn(deps.session, 'kid', kidText);
+    recordTurn(deps.session, 'termi', '(that reply was blocked)');
     return blockedResult(outputVerdict, filesChanged);
   }
 

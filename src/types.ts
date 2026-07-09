@@ -81,7 +81,16 @@ export interface SafetyPipeline {
   /** Neutralizes instruction-like content in file/notes text fed back to the model. */
   prefilterContext(text: string): string;
   checkInput(text: string, s: SessionSafetyState): Promise<ClassifierVerdict>;
-  checkOutputText(text: string, s: SessionSafetyState): Promise<ClassifierVerdict>;
+  /**
+   * source 'reply' (default) is chat output and feeds the grooming
+   * counters; 'file' is project file text, which never bumps counters and
+   * may reuse a session-scoped allow verdict for unchanged text.
+   */
+  checkOutputText(
+    text: string,
+    s: SessionSafetyState,
+    source?: 'reply' | 'file',
+  ): Promise<ClassifierVerdict>;
   scanCode(relPath: string, content: string): CodeScanResult;
   extractVisibleText(relPath: string, content: string): string;
 }

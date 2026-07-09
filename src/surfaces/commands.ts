@@ -22,6 +22,7 @@ export const COMMAND_NAMES = [
   'learn',
   'help',
   'done',
+  'quit',
   'grownups',
 ] as const;
 
@@ -36,7 +37,14 @@ export const BARE_WORDS: readonly CommandName[] = [
   'preview',
   'badges',
   'learn',
+  'quit',
 ];
+
+/**
+ * Leaving words kids type on their own. Each maps to quit so a goodbye
+ * never becomes a paid AI turn.
+ */
+export const QUIT_SYNONYMS: readonly string[] = ['exit', 'stop', 'bye', 'leave'];
 
 export type Command =
   | { kind: CommandName }
@@ -90,12 +98,18 @@ export function parseCommand(raw: string): Command {
     if ((COMMAND_NAMES as readonly string[]).includes(word)) {
       return { kind: word as CommandName };
     }
+    if (QUIT_SYNONYMS.includes(word)) {
+      return { kind: 'quit' };
+    }
     return { kind: 'unknown', word, suggestion: nearestCommand(word) };
   }
   if (!/\s/.test(input)) {
     const lower = input.toLowerCase();
     if ((BARE_WORDS as readonly string[]).includes(lower)) {
       return { kind: lower as CommandName };
+    }
+    if (QUIT_SYNONYMS.includes(lower)) {
+      return { kind: 'quit' };
     }
   }
   return { kind: 'chat', text: input };
@@ -116,13 +130,14 @@ export function helpText(): string {
     ['/learn', 'play short AI lessons'],
     ['/help', 'show this list'],
     ['/done', 'finish and celebrate'],
+    ['/quit', 'stop for today'],
     ['/grownups', 'grown-up zone, PIN needed'],
   ];
   const lines = rows.map(([cmd, what]) => `  ${cmd.padEnd(10)} ${what}`);
   return [
     'Here is what I can do:',
     ...lines,
-    'Plain words work too, like undo or ideas.',
+    'Plain words work too, like undo, ideas, or quit.',
   ].join('\n');
 }
 

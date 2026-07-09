@@ -307,3 +307,22 @@ describe('update_project_notes', () => {
     expect(fake.project.termiMdUpdates).toHaveLength(0);
   });
 });
+
+describe('file name and wordiness guards', () => {
+  it('refuses a file whose name has a bad word', async () => {
+    const fake = makeDeps();
+    const { tools } = makeTools(fake);
+    const out = await run(tools, 'write_file', { path: 'shit.js', content: 'let x = 1;' });
+    expect(out).toContain('bad-name');
+    expect(fake.project.writes).toHaveLength(0);
+  });
+
+  it('refuses a write whose visible text overflowed the extraction cap', async () => {
+    const fake = makeDeps();
+    fake.safety.visibleOverride = 'story text...\n[text truncated for review]';
+    const { tools } = makeTools(fake);
+    const out = await run(tools, 'write_file', { path: 'story.html', content: '<p>long</p>' });
+    expect(out).toContain('too-wordy');
+    expect(fake.project.writes).toHaveLength(0);
+  });
+});

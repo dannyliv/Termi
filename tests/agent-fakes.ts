@@ -111,6 +111,8 @@ export class FakeSafety {
   /** When set, prefilterInput redacts to this text with the PII notice. */
   redactTo: string | null = null;
   contextMarker = '';
+  /** When set, extractVisibleText returns this instead of the stub text. */
+  visibleOverride: string | null = null;
   checkInputCalls: string[] = [];
   checkOutputCalls: string[] = [];
 
@@ -138,7 +140,7 @@ export class FakeSafety {
     return { ok: this.scanOk, reasons: this.scanReasons };
   }
   extractVisibleText(relPath: string, content: string): string {
-    return `visible:${relPath}:${content.slice(0, 40)}`;
+    return this.visibleOverride ?? `visible:${relPath}:${content.slice(0, 40)}`;
   }
 }
 

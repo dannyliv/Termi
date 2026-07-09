@@ -14,6 +14,7 @@ import {
   collectAttention,
   needsAttentionLines,
   parseAuditLog,
+  removeProviderFromSettings,
   usageNote,
 } from '../src/grownups/panel.js';
 import { defaultSettings } from '../src/config/settings.js';
@@ -109,6 +110,10 @@ describe('validateApiKey', () => {
     expect(await validateApiKey('xai', 'k', fakeFetch(200))).toBe('ok');
   });
 
+  it('flags a rejected Grok key as bad', async () => {
+    expect(await validateApiKey('xai', 'k', fakeFetch(401))).toBe('bad');
+  });
+
   it('treats network failures as unknown, never as bad', async () => {
     const failing = (() => Promise.reject(new Error('offline'))) as typeof fetch;
     expect(await validateApiKey('anthropic', 'k', failing)).toBe('unknown');
@@ -191,5 +196,40 @@ describe('panel: attention and usage', () => {
     expect(free).toContain('free checker');
     const quota = usageNote('openai-chatgpt', false);
     expect(quota).toContain('quota');
+  });
+});
+
+describe('panel: removeProviderFromSettings', () => {
+  it('drops the provider and moves the active pointer', () => {
+    const base = {
+      ...defaultSettings(),
+      configuredProviders: ['xai', 'anthropic'] as const,
+      activeProvider: 'xai' as const,
+    };
+    const next = removeProviderFromSettings(base, 'xai');
+    expect(next.configuredProviders).toEqual(['anthropic']);
+    expect(next.activeProvider).toBe('anthropic');
+  });
+
+  it('keeps the active provider when removing another one', () => {
+    const base = {
+      ...defaultSettings(),
+      configuredProviders: ['xai', 'anthropic'] as const,
+      activeProvider: 'anthropic' as const,
+    };
+    const next = removeProviderFromSettings(base, 'xai');
+    expect(next.configuredProviders).toEqual(['anthropic']);
+    expect(next.activeProvider).toBe('anthropic');
+  });
+
+  it('goes to null when the last provider is removed', () => {
+    const base = {
+      ...defaultSettings(),
+      configuredProviders: ['openai-chatgpt'] as const,
+      activeProvider: 'openai-chatgpt' as const,
+    };
+    const next = removeProviderFromSettings(base, 'openai-chatgpt');
+    expect(next.configuredProviders).toEqual([]);
+    expect(next.activeProvider).toBeNull();
   });
 });

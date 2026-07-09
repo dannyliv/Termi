@@ -214,6 +214,20 @@ export function prefilterInput(text: string): PrefilterInputResult {
 }
 
 /**
+ * True when a kid-chosen name (project name, nickname) is safe to use.
+ * Names ride inside the trusted system prompt, scaffold titles, and menus,
+ * so profanity, jailbreak phrasing, and personal details are all refused.
+ */
+export function nameIsOkay(name: string): boolean {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return false;
+  }
+  const result = prefilterInput(trimmed);
+  return result.block === null && result.notice === null && result.redacted === trimmed;
+}
+
+/**
  * L0 pass for file and notes content fed back to the model. Jailbreak
  * phrasing is neutralized in place with [removed]. Never blocks: project
  * files belong to the kid and stay readable.

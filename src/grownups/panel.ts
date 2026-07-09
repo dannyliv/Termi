@@ -9,8 +9,8 @@
 
 import fs from 'node:fs';
 import * as p from '@clack/prompts';
-import { API_KEY_ACCOUNTS, isFallbackActive, KEYCHAIN_SERVICE } from '../auth/keychain.js';
-import { hasTokens, loadTokens } from '../auth/tokens.js';
+import { API_KEY_ACCOUNTS, deleteSecret, isFallbackActive, KEYCHAIN_SERVICE } from '../auth/keychain.js';
+import { clearTokens, hasTokens, loadTokens } from '../auth/tokens.js';
 import { hasPin, resetPin, verifyPin } from '../config/pin.js';
 import {
   auditLogPath,
@@ -26,7 +26,7 @@ import { appendAudit, verifyAuditChain } from '../safety/audit.js';
 import { style } from '../ui/theme.js';
 import { T } from '../ui/text.js';
 import type { ModelAlias, ProviderId, SafetyLevel, Settings } from '../types.js';
-import { configureProvider, providerLabel } from '../setup/wizard.js';
+import { configureProvider, KEY_ACCOUNT, providerLabel } from '../setup/wizard.js';
 
 /** One parsed line from the audit log, chain fields removed. */
 export interface AuditLine {
@@ -218,7 +218,7 @@ export async function pinGate(): Promise<boolean> {
     }
     if (result.lockedForSeconds !== undefined) {
       const minutes = Math.max(1, Math.ceil(result.lockedForSeconds / 60));
-      p.log.warn(`${T.grownups.lockout} (${minutes} min)`);
+      p.log.warn(T.grownups.lockout.replace('{minutes}', String(minutes)));
       return false;
     }
     p.log.warn(T.grownups.wrongPin);
@@ -240,6 +240,27 @@ export async function pinGate(): Promise<boolean> {
   }
 }
 
+/**
+ * Pure settings transition for removing one provider: drops it from the
+ * configured list and moves the active pointer to the first remaining
+ * provider (or null). Exported so tests cover it without the prompts.
+ */
+export function removeProviderFromSettings(settings: Settings, id: ProviderId): Settings {
+  const configured = settings.configuredProviders.filter((p) => p !== id);
+  const active =
+    settings.activeProvider === id ? (configured[0] ?? null) : settings.activeProvider;
+  return { ...settings, configuredProviders: configured, activeProvider: active };
+}
+
+/** Deletes the stored credential for one provider (key or sign-in tokens). */
+function deleteProviderCredential(id: ProviderId): void {
+  if (id === 'openai-chatgpt') {
+    clearTokens();
+    return;
+  }
+  deleteSecret(KEY_ACCOUNT[id]);
+}
+
 async function providersMenu(settings: Settings): Promise<Settings> {
   let current = settings;
   for (;;) {
@@ -258,7 +279,10 @@ async function providersMenu(settings: Settings): Promise<Settings> {
       options: [
         { value: 'add', label: 'Add a provider' },
         ...(current.configuredProviders.length > 0
-          ? [{ value: 'switch', label: 'Switch the active provider' }]
+          ? [
+              { value: 'switch', label: 'Switch the active provider' },
+              { value: 'remove', label: 'Remove a provider' },
+            ]
           : []),
         { value: 'back', label: 'Back' },
       ],
@@ -288,6 +312,28 @@ async function providersMenu(settings: Settings): Promise<Settings> {
         current = saveSettings({ ...current, activeProvider: active });
         audit('provider_change', `active ${active}`);
       }
+    } else if (pick === 'remove') {
+      const target = await p.select<ProviderId>({
+        message: 'Which one should Termi forget?',
+        options: current.configuredProviders.map((id) => ({
+          value: id,
+          label: providerLabel(id),
+        })),
+      });
+      if (p.isCancel(target)) {
+        continue;
+      }
+      const sure = await p.confirm({
+        message: `Remove ${providerLabel(target)}? Its saved key or sign-in is deleted.`,
+        initialValue: false,
+      });
+      if (p.isCancel(sure) || !sure) {
+        continue;
+      }
+      deleteProviderCredential(target);
+      current = saveSettings(removeProviderFromSettings(current, target));
+      audit('provider_change', `removed ${target}`);
+      p.log.success(`${providerLabel(target)} is removed.`);
     }
   }
 }

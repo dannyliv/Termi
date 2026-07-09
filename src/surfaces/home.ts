@@ -12,6 +12,7 @@ import path from 'node:path';
 import * as p from '@clack/prompts';
 import { atomicWriteFileSync, termiHome } from '../config/paths.js';
 import { saveSettings } from '../config/settings.js';
+import { nameIsOkay } from '../safety/prefilter.js';
 import { scaffolds, scaffoldById } from '../projects/scaffolds/index.js';
 import { suggestProjectNames } from '../setup/wizard.js';
 import { BADGES, celebrate, confetti, renderBadgeShelf } from '../ui/celebrate.js';
@@ -141,7 +142,12 @@ async function pickProjectName(themeLabel: string): Promise<string | null> {
   }
   const typed = await p.text({
     message: 'What is its name?',
-    validate: (value) => ((value ?? '').trim().length > 0 ? undefined : 'It needs a name.'),
+    validate: (value) => {
+      const trimmed = (value ?? '').trim();
+      if (trimmed.length === 0) return 'It needs a name.';
+      if (!nameIsOkay(trimmed)) return 'That name will not work. Try another one.';
+      return undefined;
+    },
   });
   if (p.isCancel(typed)) {
     return null;

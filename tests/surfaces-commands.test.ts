@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DASH_RE, fkGrade } from './ui-fk.js';
 import type { PreviewHandle, SnapshotStore } from '../src/types.js';
 import {
   BARE_WORDS,
@@ -196,5 +197,50 @@ describe('executeDone', () => {
     expect(donEarnsGameBadge('games')).toBe(true);
     expect(donEarnsGameBadge('biggames')).toBe(true);
     expect(donEarnsGameBadge('stories')).toBe(false);
+  });
+});
+
+describe('quit command', () => {
+  it('parses /quit and the bare word', () => {
+    expect(parseCommand('/quit')).toEqual({ kind: 'quit' });
+    expect(parseCommand('quit')).toEqual({ kind: 'quit' });
+    expect(parseCommand('QUIT')).toEqual({ kind: 'quit' });
+  });
+
+  it('maps the leaving words kids type to quit', () => {
+    for (const word of ['exit', 'stop', 'bye', 'leave', '/exit', '/bye']) {
+      expect(parseCommand(word), word).toEqual({ kind: 'quit' });
+    }
+  });
+
+  it('leaves sentences containing leaving words as chat', () => {
+    expect(parseCommand('stop the music when I win').kind).toBe('chat');
+    expect(parseCommand('make the exit door red').kind).toBe('chat');
+  });
+
+  it('shows /quit in the help list', () => {
+    expect(helpText()).toContain('/quit');
+    expect(helpText()).toContain('quit');
+  });
+});
+
+describe('new kid copy quality', () => {
+  it('help copy reads at kid level with no fancy dashes', () => {
+    const text = helpText();
+    expect(DASH_RE.test(text)).toBe(false);
+    for (const line of ['stop for today', 'Plain words work too, like undo, ideas, or quit.']) {
+      expect(fkGrade(line), line).toBeLessThanOrEqual(6.5);
+      expect(DASH_RE.test(line)).toBe(false);
+    }
+  });
+
+  it('the name screening copy reads at kid level', () => {
+    for (const line of [
+      'That name will not work. Pick a made-up one.',
+      'That name will not work. Try another one.',
+    ]) {
+      expect(fkGrade(line), line).toBeLessThanOrEqual(6.5);
+      expect(DASH_RE.test(line)).toBe(false);
+    }
   });
 });

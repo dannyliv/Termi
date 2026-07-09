@@ -24,7 +24,12 @@ priority order:
 4. **Cheap to run.** Hard token budgets on prompts, history, replies, and
    classifier calls, all enforced by unit tests.
 5. **Multi-model.** ChatGPT sign-in (OAuth, works on a free plan) is the default;
-   Anthropic, OpenAI, and xAI API keys are also supported.
+   Anthropic, OpenAI, and xAI (Grok) API keys are also supported. Grok is a
+   full first-class provider: wizard entry with an enforced adults-only
+   parent acknowledgment, model speed picker (grok-4.3 zippy, grok-4.5
+   smart), classifier fallback, and error mapping. Model ids were verified
+   against docs.x.ai on 2026-07-09; no live-key E2E has run since the
+   grok-4.5 addition (no xAI key on the dev machine).
 
 ## Hard rules (read before changing anything)
 
@@ -67,7 +72,8 @@ priority order:
 ## Repo map
 
 ```
-bin/termi.js               Entry shim, requires Node >= 20.19, loads dist/cli.js
+bin/termi.js               Entry shim, requires Node >= 20.19, answers
+                           --version by itself, then loads dist/cli.js
 scripts/copy-assets.mjs    Copies non-TS assets (vendored engine, licenses) into dist/
 src/
   types.ts                 Frozen shared contracts: Settings, ProviderClient,
@@ -104,22 +110,45 @@ src/
                            system message to a top-level instructions field,
                            strips rejected params, and defaults store:false.
                            makeSafetyIdFetch injects a hashed safety identifier
-                           into openai-api request bodies. pickClassifierBackend
-                           chooses the moderation/classifier model.
+                           into openai-api request bodies (install id resolved
+                           once per client, not per request). The xai client
+                           refuses to build unless settings.xaiParentAck is
+                           true (deps.xaiParentAck overrides in tests).
+                           pickClassifierBackend chooses the moderation and
+                           classifier backends; when the moderation key exists
+                           but the openai-api client fails to build, the
+                           prompted kid-check falls through anthropic ->
+                           chatgpt -> xai so grooming/pii/jailbreak coverage
+                           never silently drops.
     models.ts              Model alias map (kid-friendly names to provider model
-                           ids) and classifier model choices.
+                           ids) and classifier model choices. xai: grok-4.3
+                           (zippy, classifier) and grok-4.5 (smart).
     errors.ts              classifyProviderError: maps SDK/HTTP errors (including
                            wrapped RetryError) to kid-safe error screens.
   safety/                  The safety engine. Layers, in order:
     prefilter.ts           L0, local: NFKC and de-leet normalization, profanity
                            wordlist (game words carved out), PII redaction to
                            [secret], jailbreak phrase blocks. Runs on input
-                           before anything else.
+                           before anything else. nameIsOkay screens kid-chosen
+                           names (projects, nicknames) before they enter the
+                           system prompt or menus.
     classifier.ts          L2/L4, model-based: input classifier runs concurrently
                            with the main call and gates tool side effects;
                            output classifier checks the reply and every file
                            write. 8s timeout, any error = block (fail closed).
-    taxonomy.ts            Category and severity definitions shared by all layers.
+                           Long text is judged chunk by chunk (JUDGE_TEXT_CAP
+                           per call), braces in judged text are swapped to
+                           parentheses so an echo cannot forge a verdict, the
+                           verdict budget is CLASSIFIER_MAX_OUTPUT_TOKENS
+                           (roomy, for reasoning models), and identical file
+                           text reuses a session-scoped allow cache (blocks
+                           are never cached). checkOutputText takes a source
+                           tag: 'reply' feeds grooming counters, 'file' never
+                           does.
+    taxonomy.ts            Category and severity definitions shared by all
+                           layers. parseVerdict takes the LAST parseable JSON
+                           object (anti-forgery); the classifier prompt marks
+                           judged text as data.
     codescan.ts            Static scan of generated code (network egress, eval,
                            storage abuse). Defense in depth; the preview CSP is
                            the sound egress control.
@@ -127,18 +156,27 @@ src/
                            HTML/JS/CSS so file writes can be classified before
                            they reach disk.
     session.ts             Cross-turn counters (grooming pattern tracking).
+                           Counters bump only from the conversation (kid
+                           input and Termi replies), never from file text.
+                           Blocked turns are recorded into the window too.
     blocks.ts              Kid-facing block screens per category, including the
                            calm supportive screen for self-harm topics.
     audit.ts               Hash-chained JSONL audit log (HMAC forward chain),
                            5MB rotation, written for every block and parent
                            action. Parents view it from the grown-ups panel.
+                           The HMAC key and the chain tip are cached between
+                           appends (self-invalidating on home or file change)
+                           so appends stop being O(file size) + keychain hit.
   agent/
     loop.ts                runTurn: one chat turn. Streams the model reply,
                            runs the input classifier concurrently, gates tools
                            on the verdict, classifies output and file writes,
                            snapshots before changes.
     tools.ts               The model-facing tools (read/write/list files, etc.),
-                           all jailed to the active project directory.
+                           all jailed to the active project directory. Writes
+                           also screen the file name for profanity and refuse
+                           files whose visible text overflows the extraction
+                           cap (too-wordy) instead of half-checking them.
     context.ts             Token budgets: HISTORY_TURN_CAP 30, HISTORY_CHAR_BUDGET
                            6000, changed-files-only embedding keyed by sha256.
     prompts/system.ts      System prompt, SYSTEM_PROMPT_CHAR_CAP 3500 (unit
@@ -166,8 +204,12 @@ src/
   surfaces/
     home.ts                The landing screen (continue project, new, learn...).
     chat.ts                The chat loop UI: slash commands /preview /undo /redo
-                           /new /ideas /badges /learn /help /done /grownups.
-    commands.ts            Slash command parsing and help table.
+                           /new /ideas /badges /learn /help /done /quit
+                           /grownups. The typewriter reveal is capped at 1.5s
+                           total. xai availability requires the parent ack.
+    commands.ts            Slash command parsing and help table. quit works as
+                           a bare word, and exit/stop/bye/leave map to it so a
+                           goodbye never becomes a paid AI turn.
   learn/
     lessons.ts             Six scripted, token-free lessons teaching kids how to
                            work with an AI coding helper, plus PROMPT_GRADER
@@ -177,20 +219,30 @@ src/
   setup/
     wizard.ts              First-run wizard: parent gate, PIN, provider choice,
                            safety settings. Writes the keychain setup marker.
+                           configureProvider loops back to the picker after a
+                           failed sign-in or a declined xai ack (only Skip
+                           exits with null). Keys are validated BEFORE being
+                           saved; a clear 401/403 is never stored or marked
+                           configured. The xai ack is skipped when already
+                           confirmed. Kid names are screened with nameIsOkay.
+                           Exports KEY_ACCOUNT (provider -> keychain account).
     launcher.ts            Writes a double-clickable Desktop launcher per
                            platform (Termi.command, Termi.bat, Termi.desktop),
                            best effort and silent on failure. Boot routing
                            (first-run wizard vs tamper warning) is decideBoot
                            in src/cli.ts; the Node version check is in
                            bin/termi.js.
-  grownups/panel.ts        PIN-gated parent panel: provider keys, safety level,
-                           audit log viewer, usage and cost notes.
+  grownups/panel.ts        PIN-gated parent panel: provider keys (add, switch,
+                           and remove; removal deletes the credential and
+                           reassigns the active provider via the pure helper
+                           removeProviderFromSettings), safety level, audit
+                           log viewer, usage and cost notes.
   ui/                      theme.ts (colors and ThemeConfig), mascot.ts (robot
                            mascot with ASCII fallback), banner.ts, celebrate.ts,
                            text.ts (wrapping, kid copy helpers), errors.ts
                            (kid-safe error screens).
 tests/                     46 vitest files plus 3 shared helpers (agent-fakes.ts,
-                           safety-corpus.ts, ui-fk.ts). 979 tests. Naming:
+                           safety-corpus.ts, ui-fk.ts). 1005 tests. Naming:
                            <area>-<module>.test.ts.
 .github/workflows/ci.yml   Matrix: ubuntu, macos, windows x Node 20, 22.
 ```
@@ -206,11 +258,13 @@ tests/                     46 vitest files plus 3 shared helpers (agent-fakes.ts
    and a blocked verdict aborts the stream.
 4. A snapshot is taken once at the start of the turn, before anything can write
    (so /undo always covers the whole turn). Each file write then passes the
-   static code scanner, then has its visible text extracted and classified.
-   Only then does it reach disk.
+   file name screen, the static code scanner, the too-wordy overflow check,
+   and finally has its visible text extracted and classified in full (chunked
+   when long, cached when unchanged). Only then does it reach disk.
 5. The final reply text is classified before the turn completes. Any BLOCKED
    verdict at any layer replaces output with a block screen and logs to the
-   audit chain.
+   audit chain. Blocked turns still enter the session window so the grooming
+   watch keeps seeing them.
 6. The preview server picks up changed files and pushes an SSE reload.
 
 All providers are called through the AI SDK (`ai` package, streamText
@@ -240,7 +294,7 @@ fallback).
 ```bash
 npm install
 npm run build        # tsc + copy vendored assets into dist/
-npm test             # vitest run (979 tests, no network, no real HOME)
+npm test             # vitest run (1005 tests, no network, no real HOME)
 npm run typecheck    # src/ only; tests/ are excluded from tsconfig
 npm link && termi    # try the CLI locally
 ```
@@ -272,8 +326,10 @@ build step, and run the kid-copy reading-level checks.
 `createProviderClient` in `providers/index.ts`, map models in
 `providers/models.ts`, add error mapping in `providers/errors.ts`, and decide
 its classifier role in `pickClassifierBackend`. Add wizard and grown-ups panel
-entries. Any provider with content concerns for kids must be gated behind a
-parent acknowledgment in the wizard (see how the xai provider does it).
+entries (including KEY_ACCOUNT and the remove flow). Any provider with content
+concerns for kids must be gated behind a parent acknowledgment enforced in
+`createProviderClient`, not only in the wizard UI (see how the xai provider
+does it: the client factory checks settings.xaiParentAck).
 
 **New lesson.** Add to `learn/lessons.ts` following the existing shape (scripted
 steps, no model calls), give it the next badge id, and extend
@@ -305,3 +361,18 @@ budget), and add both must-block and must-not-block cases to
   classifier backend).
 - The code scanner is best-effort by design; the preview CSP is the sound
   egress control. Do not advertise the scanner as a guarantee.
+- The kid's message is sent to the provider concurrently with the input check
+  (latency design); a blocked message still transits the provider once with
+  PII already masked. SAFETY.md states this honestly.
+- Files edited outside Termi are not re-screened; they pass only the
+  jailbreak-neutralizing filter when read back into the model context.
+- The needs-attention banner only detects a dead ChatGPT sign-in; a revoked
+  API key surfaces as the kid-facing auth screen instead.
+- 429 retry-after parsing knows OpenAI-shaped headers; an xAI 429 without a
+  standard retry-after header shows the no-time quota copy (cosmetic).
+- Audit-append failures are swallowed after the block is enforced; the block
+  itself always stands.
+- The self-harm support copy points to the 988 line, which is US-only.
+- Grok model ids (grok-4.3, grok-4.5) were verified against docs.x.ai on
+  2026-07-09, but no live xAI E2E has run since grok-4.5 was added. Verify
+  with a real key before shipping xai changes.

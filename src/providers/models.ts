@@ -30,7 +30,7 @@ export const MODELS: Record<ProviderId, ProviderModelSet> = {
   },
   xai: {
     zippy: 'grok-4.3',
-    smart: 'grok-4.3',
+    smart: 'grok-4.5',
     classifier: 'grok-4.3',
   },
 };
