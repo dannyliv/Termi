@@ -17,7 +17,6 @@ import { appendAudit } from '../safety/audit.js';
 import { ensureGuardFetch, guardProgressBar } from '../safety/guarddownload.js';
 import { guardModelReady } from '../safety/modelstore.js';
 import { nameIsOkay } from '../safety/prefilter.js';
-import { scaffoldById } from '../projects/scaffolds/index.js';
 import { renderBanner } from '../ui/banner.js';
 import { mascot } from '../ui/mascot.js';
 import { style } from '../ui/theme.js';
@@ -307,16 +306,7 @@ async function createPinStep(): Promise<void> {
 }
 
 async function consentStep(settings: Settings): Promise<Settings> {
-  const ageBand = ensure(
-    await p.select<'under13' | 'teen'>({
-      message: 'How old is your kid?',
-      options: [
-        { value: 'under13', label: 'Under 13' },
-        { value: 'teen', label: '13 or older' },
-      ],
-      initialValue: 'under13',
-    }),
-  );
+  // One safety bar for every age. No under-13 / over-13 split.
   const agreed = ensure(
     await p.confirm({ message: `${T.wizard.consentIntro} Do you agree?`, initialValue: true }),
   );
@@ -329,12 +319,12 @@ async function consentStep(settings: Settings): Promise<Settings> {
       ts: attestedAt,
       layer: 'system',
       event: 'consent',
-      excerpt: `parent consent, age band ${ageBand}`,
+      excerpt: 'parent consent, one safety bar for all ages',
     });
   } catch {
     // Consent still counts; the audit line is best effort.
   }
-  return { ...settings, ageBand, consentAttestedAt: attestedAt };
+  return { ...settings, ageBand: 'under13', consentAttestedAt: attestedAt };
 }
 
 async function providerLoop(settings: Settings): Promise<Settings> {
@@ -372,43 +362,29 @@ async function providerLoop(settings: Settings): Promise<Settings> {
 }
 
 /**
- * Offers the on-device safety checker download. Default is yes: the
- * classifier setting ships on, and this step starts fetching its model file
- * in the background. The parent hears, plainly, that basic safety (the
- * local filter plus the online checks) is already on and that the checker
- * strengthens it when the download lands, then chooses to start building
- * now or wait and watch the bar. Either way the pipeline hot-attaches the
- * checker the moment the verified file is in place. Declining turns the
- * setting off; a failed or interrupted download resumes on the next start.
+ * Installs the on-device safety checker as part of setup. Always on: the
+ * model download starts here (and resumes on later boots). Parent can wait
+ * for the bar or keep going; declining is not offered.
  */
 async function localGuardStep(settings: Settings): Promise<Settings> {
   if (guardModelReady()) {
-    // Model already present: keep whatever the parent chose before. A
-    // wizard re-run must not silently flip a deliberate off back to on.
-    return settings;
+    return { ...settings, localClassifier: true };
   }
-  const wants = ensure(await p.confirm({ message: T.wizard.guardOffer, initialValue: true }));
-  if (!wants) {
-    p.log.info(T.wizard.guardDeclined);
-    audit('settings_change', 'local classifier off (declined in setup)');
-    return { ...settings, localClassifier: false };
-  }
+  p.log.info(T.wizard.guardOffer);
   const fetchDone = ensureGuardFetch();
   p.log.info(T.wizard.guardBackground);
+  audit('settings_change', 'local classifier install started in setup');
   const wait = ensure(
     await p.select<'now' | 'wait'>({
       message: T.wizard.guardWaitPick,
       options: [
-        { value: 'now', label: T.wizard.guardStartNow, hint: T.wizard.guardStartNowHint },
         { value: 'wait', label: T.wizard.guardWaitHere, hint: T.wizard.guardWaitHereHint },
+        { value: 'now', label: T.wizard.guardStartNow, hint: T.wizard.guardStartNowHint },
       ],
-      initialValue: 'now',
+      initialValue: 'wait',
     }),
   );
   if (wait === 'wait') {
-    // The wait shows a live bar with periodic escape hatches (after one
-    // minute, then every ten): a slow connection must not trap the parent
-    // in setup when the download finishes fine in the background anyway.
     const escapeAfterMs = [60_000, 600_000];
     let escapeIndex = 0;
     for (;;) {
@@ -463,61 +439,11 @@ async function firstGameStep(settings: Settings): Promise<void> {
   if (p.isCancel(wants) || !wants) {
     return;
   }
-  const games = scaffoldById('games');
-  if (games === undefined) {
-    return;
-  }
-  const themeId = await p.select<string>({
-    message: 'Pick a style for your game.',
-    options: games.themes.map((t) => ({ value: t.id, label: `${t.emoji} ${t.label}` })),
-  });
-  if (p.isCancel(themeId)) {
-    return;
-  }
-  const theme = games.themes.find((t) => t.id === themeId);
-  if (theme === undefined) {
-    return;
-  }
-  const CUSTOM = '__custom__';
-  const suggestions = suggestProjectNames(theme.label);
-  const namePick = await p.select<string>({
-    message: 'Pick a name for it.',
-    options: [
-      ...suggestions.map((n) => ({ value: n, label: n })),
-      { value: CUSTOM, label: 'Type my own name' },
-    ],
-  });
-  if (p.isCancel(namePick)) {
-    return;
-  }
-  let prettyName = namePick;
-  if (namePick === CUSTOM) {
-    const typed = await p.text({
-      message: 'What is its name?',
-      validate: (value) => {
-        const trimmed = (value ?? '').trim();
-        if (trimmed.length === 0) return 'It needs a name.';
-        if (!nameIsOkay(trimmed)) return 'That name will not work. Try another one.';
-        return undefined;
-      },
-    });
-    if (p.isCancel(typed)) {
-      return;
-    }
-    prettyName = typed.trim();
-  }
   try {
-    const create = await import('../projects/create.js');
-    const home = await import('../surfaces/home.js');
-    const made = create.createProject('games', theme.id, prettyName);
-    await home.awardBadge('first-project');
-    const starters = made.starterPrompts.slice(0, 2);
-    if (starters.length > 0) {
-      p.note(starters.map((line) => `- ${line}`).join('\n'), 'Try saying');
-    }
-    await home.openChatLoop(made.project, settings);
+    const build = await import('../surfaces/buildGame.js');
+    await build.runBuildGame(settings);
   } catch {
-    p.log.warn('I could not start the game yet. Try "termi new" next time.');
+    p.log.warn('I could not start the game yet. Try Build a game next time.');
   }
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "termi-kids",
-  "version": "0.1.2",
-  "description": "Termi is a friendly coding buddy for kids. Build games, art, stories, and websites right from your computer, with a grown-up approved AI helper and strong safety rails.",
+  "version": "0.2.0",
+  "description": "Termi is a friendly coding buddy for kids. Build browser games with AI prompts, Learn AI lessons, and strong local safety rails.",
   "keywords": [
     "kids",
     "coding",

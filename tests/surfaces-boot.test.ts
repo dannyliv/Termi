@@ -45,11 +45,13 @@ describe('cliHelp', () => {
       'termi new',
       'termi go',
       'termi preview',
-      'termi ideas',
+      'termi learn',
       'termi grownups',
       'termi update',
     ]) {
       expect(text).toContain(cmd);
     }
+    expect(text).toContain('build a game');
+    expect(text).not.toContain('termi ideas');
   });
 });

@@ -187,7 +187,7 @@ export async function runLesson(lesson: Lesson, say: Say = defaultSay): Promise<
  */
 export async function runLearnMenu(): Promise<void> {
   console.log(mascot('happy'));
-  console.log('Welcome to Termi school! Six tiny lessons, zero homework.');
+  console.log('Learn AI: six tiny lessons on how to prompt. Zero homework.');
   for (;;) {
     const done = new Set(loadProgress().completed);
     const options = [

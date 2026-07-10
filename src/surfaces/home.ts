@@ -20,13 +20,12 @@ import {
 import { nameIsOkay } from '../safety/prefilter.js';
 import { scaffolds, scaffoldById } from '../projects/scaffolds/index.js';
 import { suggestProjectNames } from '../setup/wizard.js';
-import { BADGES, celebrate, confetti, renderBadgeShelf } from '../ui/celebrate.js';
+import { BADGES, celebrate, confetti } from '../ui/celebrate.js';
 import { mascot } from '../ui/mascot.js';
 import { style } from '../ui/theme.js';
 import { T } from '../ui/text.js';
 import type { Settings } from '../types.js';
 import type { ProjectContext } from '../projects/store.js';
-import { executeIdeas } from './commands.js';
 
 /** Where the earned-badge list lives. */
 export function badgesFilePath(): string {
@@ -352,6 +351,41 @@ async function loadLastProject(settings: Settings): Promise<LastProject | null> 
   }
 }
 
+/** Kid home menu values (simplified product surface). */
+export const HOME_MENU_VALUES = [
+  'build',
+  'library',
+  'learn',
+  'continue',
+  'grownups',
+  'quit',
+] as const;
+
+export type HomeMenuValue = (typeof HOME_MENU_VALUES)[number];
+
+/**
+ * Pure home option list for tests. Build a game and Learn AI are always
+ * present; continue and library depend on whether projects exist.
+ */
+export function homeMenuOptions(hasLast: boolean, hasLibrary: boolean): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [];
+  if (hasLast) {
+    options.push({ value: 'continue', label: T.home.menuContinue });
+  }
+  options.push(
+    { value: 'build', label: T.home.menuBuild },
+    { value: 'library', label: T.home.menuLibrary },
+    { value: 'learn', label: T.home.menuLearn },
+    { value: 'grownups', label: T.home.menuGrownups },
+    { value: 'quit', label: T.home.menuQuit },
+  );
+  if (!hasLibrary) {
+    // Library stays listed so kids discover where games are saved.
+    void hasLibrary;
+  }
+  return options;
+}
+
 /** The home menu loop for a returning kid. */
 export async function showHome(settings: Settings): Promise<void> {
   const nickname = settings.kidNickname.trim();
@@ -378,23 +412,19 @@ export async function showHome(settings: Settings): Promise<void> {
       console.log(style.dim(T.home.guardOn));
     }
 
-    const options: { value: string; label: string }[] = [];
-    if (last !== null) {
-      options.push({ value: 'continue', label: `Keep building ${last.context.meta.prettyName}` });
+    let hasLibrary = false;
+    try {
+      const store = await import('../projects/store.js');
+      hasLibrary = store.listProjects().length > 0;
+    } catch {
+      hasLibrary = false;
     }
-    options.push(
-      { value: 'open', label: T.home.menuGo },
-      { value: 'new', label: T.home.menuNew },
-      { value: 'ideas', label: T.home.menuIdeas },
-      { value: 'learn', label: 'Learn AI tricks' },
-      { value: 'badges', label: T.home.menuBadges },
-      { value: 'grownups', label: T.home.menuGrownups },
-      { value: 'quit', label: T.home.menuQuit },
-    );
+
+    const options = homeMenuOptions(last !== null, hasLibrary);
     const pick = await p.select<string>({
       message: 'What now?',
       options,
-      initialValue: last !== null ? 'continue' : 'new',
+      initialValue: last !== null ? 'continue' : 'build',
     });
     if (p.isCancel(pick) || pick === 'quit') {
       p.outro(T.home.goodbye);
@@ -402,18 +432,23 @@ export async function showHome(settings: Settings): Promise<void> {
     }
     if (pick === 'continue' && last !== null) {
       await openChatLoop(last.context, settings);
-    } else if (pick === 'open') {
+    } else if (pick === 'library') {
       await openPicked(settings);
-    } else if (pick === 'new') {
-      const made = await runNewProject(settings);
-      if (made !== null) {
-        await openChatLoop(made, settings);
+    } else if (pick === 'build') {
+      try {
+        const build = await import('./buildGame.js');
+        const made = await build.runBuildGame(settings);
+        if (made !== null) {
+          settings.lastProjectSlug = made.meta.slug;
+          try {
+            saveSettings(settings);
+          } catch {
+            //
+          }
+        }
+      } catch {
+        p.log.warn('Build a game is taking a nap. Try again soon.');
       }
-    } else if (pick === 'ideas') {
-      const scaffoldId = last !== null ? last.context.meta.scaffoldId : 'games';
-      await executeIdeas(scaffoldId, (text) => {
-        console.log(text);
-      });
     } else if (pick === 'learn') {
       try {
         const learn = await import('../learn/runner.js');
@@ -421,8 +456,6 @@ export async function showHome(settings: Settings): Promise<void> {
       } catch {
         p.log.warn('Learn mode is taking a nap. Try again soon.');
       }
-    } else if (pick === 'badges') {
-      console.log(renderBadgeShelf(loadBadges()));
     } else if (pick === 'grownups') {
       try {
         const panel = await import('../grownups/panel.js');
@@ -443,7 +476,7 @@ async function openPicked(settings: Settings): Promise<void> {
   }
   const metas = mods.store.listProjects();
   if (metas.length === 0) {
-    p.log.info('No projects yet. Pick "Make something new"!');
+    p.log.info('No games yet. Pick "Build a game"!');
     return;
   }
   const first = metas[0];

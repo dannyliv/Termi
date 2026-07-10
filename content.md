@@ -8,16 +8,20 @@ this file is for builders.
 
 ## What Termi is
 
-Termi is a kid-friendly agentic coding CLI for children around age 10 and up. A kid
-types what they want to build in plain language, an AI helper writes and edits the
-files, and a local browser preview shows the result live. The product goals, in
-priority order:
+Termi is a kid-friendly agentic coding CLI for children around age 10 and up. The
+primary kid path is simple: **Build a game** (31 ideas: own idea + 30 HTML
+browser games) and **Learn AI** (prompting lessons). A kid picks an idea, writes
+or co-writes a prompt, an AI helper writes HTML/CSS/JS, and a local browser
+preview updates after each turn. No age-band split: one safety bar for everyone.
+The product goals, in priority order:
 
 1. **Safety first.** A layered, fail-closed safety pipeline checks what kids type,
    what the model says, and every file before it reaches disk. Parents control
-   settings behind a PIN, and the settings file is tamper-evident.
-2. **Fast first win.** `termi new` scaffolds a working project and opens it in the
-   browser within seconds. No build step, no network calls in kid projects.
+   settings behind a PIN, and the settings file is tamper-evident. Setup always
+   starts the on-device safety classifier download.
+2. **Fast first win.** Build a game creates a blank local shell and opens the
+   browser preview; the first prompt fills it in. No stock playable games ship
+   as the product.
 3. **Kid-readable everything.** Every string a kid sees is short, warm, and tested
    for reading level (target Flesch-Kincaid grade 4 to 5; tests enforce a hard
    ceiling of grade 6.5 and sentences under 15 words).
@@ -89,10 +93,9 @@ src/
                            SafetyPipeline, ClassifierVerdict, PreviewHandle,
                            SnapshotStore, ScaffoldDef, ThemeConfig, AuditEvent.
                            Treat as the spec; change with care.
-  cli.ts                   Argv routing: termi | new | go | preview | ideas |
-                           learn | grownups | update | help | --version.
-                           After setup, session start may offer an npm update
-                           (y/n) via update/prompt.ts.
+  cli.ts                   Argv routing: termi | new (=build game) | go |
+                           preview | learn | grownups | update | help |
+                           --version. Session start may offer npm update y/n.
   update/
     version.ts             Local package version + simple semver compare.
                            NPM_PACKAGE is termi-kids (bin remains termi).
@@ -268,35 +271,34 @@ src/
                            tested), spotlighting tags around untrusted text,
                            game-content carve-out, 80-word reply instruction.
   projects/
-    create.ts              termi new flow: category, theme, name, scaffold copy,
-                           preview launch.
+    gameIdeas.ts           31 Build-a-game ideas: "Build my own idea" first,
+                           then 30 local HTML game seeds (no image gen).
+    blankGame.ts           createBlankGameProject: empty canvas shell, no
+                           stock playable game. Saved under TERMI_PROJECTS_DIR.
+    create.ts              Legacy scaffold create (still used by remix path).
     store.ts               Project metadata (.termi.json), TERMI.md project
                            memory (recap), listing and lookup.
     snapshots.ts           Content-addressed undo/redo snapshots under
                            TERMI_HOME/snapshots/<slug>/. Kid files only.
-    ideas.ts               Rotating prompt-idea decks per category (15 each
-                           plus generic fallbacks).
-    quests.ts              Build Quests: one step-by-step guided build per
-                           scaffold (5 steps: kid instruction + ready prompt).
-                           Pure registry + questsFor/questById/questStepLine.
-                           Quest prompts go through the normal chat turn, so
-                           the full safety pipeline applies.
-    scaffolds/             Nine scaffold modules: games (canvas), biggames
-                           (vendored KAPLAY engine), art, music, pets, stories,
-                           quizzes, websites, characters. index.ts is the
-                           registry. Each scaffold: max 3 kid files, vanilla JS,
-                           no build step, no network. vendor/ holds kaplay.mjs
-                           and its license; copy-assets.mjs ships it.
+    ideas.ts               Prompt-idea decks (still used inside open chat).
+    quests.ts              Build Quests registry (open-chat /quest path).
+    scaffolds/             Scaffold modules remain for library/remix and
+                           tests; primary kid path uses blankGame, not stock
+                           playable templates.
   preview/server.ts        Hand-rolled node:http server, 127.0.0.1 only, base
                            port 4311 with a 50-port scan. Strict CSP
                            (default-src 'self') is the egress control. SSE live
                            reload via an injected external script. Path
                            traversal jail. Never serves TERMI.md or dotfiles.
   surfaces/
-    home.ts                The landing screen (continue project, new, learn...).
-    chat.ts                The chat loop UI: slash commands /preview /undo /redo
-                           /new /ideas /badges /learn /quest /help /done /quit
-                           /grownups. The typewriter reveal is capped at 1.5s
+    home.ts                Kid home: Build a game, My games, Learn AI,
+                           continue, grown-ups. homeMenuOptions() is pure.
+    buildGame.ts           Build loop UI: idea pick, help/write prompt,
+                           runTurn, preview refresh, done/improve, polish.
+    buildLoop.ts           Pure prompt helpers (suggest, polish, summary).
+    chat.ts                Open-project chat for library continues: slash
+                           /preview /undo /redo /ideas /badges /learn /quest
+                           /help /done /quit /grownups. Typewriter 1.5s cap.
                            total. xai availability requires the parent ack.
                            Quest mode: /quest starts the scaffold's guided
                            build; each step prints its header and ready
@@ -340,9 +342,10 @@ src/
                            text.ts (wrapping, kid copy helpers), errors.ts
                            (kid-safe error screens).
 tests/                     Vitest files plus shared helpers (agent-fakes.ts,
-                           safety-corpus.ts, ui-fk.ts). 1097+ tests as of
-                           0.1.2. Naming: <area>-<module>.test.ts. Update
-                           tests live in update-version.test.ts.
+                           safety-corpus.ts, ui-fk.ts). 1115+ tests as of
+                           0.2.0. Naming: <area>-<module>.test.ts. Build-game
+                           coverage: projects-game-ideas, projects-blank-game,
+                           surfaces-build-loop, setup-no-age-band.
 .github/workflows/ci.yml   Matrix: ubuntu, macos, windows x Node 20, 22.
 ```
 
@@ -495,8 +498,13 @@ budget), and add both must-block and must-not-block cases to
 
 ## Release log (short)
 
+- **0.2.0 (2026-07-10):** Simplified kid product: Build a game (own idea + 30
+  HTML ideas, prompt help, live preview, done/improve + polish), Learn AI,
+  My games library. No age-band UI; one safety bar. Setup always installs
+  on-device classifier. Blank game shells (no stock playable games on the
+  primary path).
 - **0.1.2 (2026-07-10):** L0 prefilter expanded (grooming, self-harm ideation,
   PII probes, base64 jailbreak). `termi update` + session-start y/n version
-  check. npm + GitHub main `ff4dbd4`.
+  check.
 - **0.1.1:** Safety levels removed; setup teaches the guard download; README
   safety section.

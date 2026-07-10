@@ -10,17 +10,15 @@
 
 # Termi
 
-Termi is a friendly robot that helps you build things on a real computer.
+Termi is a friendly robot that helps you build browser games on a real computer.
 
-You type what you want. Termi writes the code with you. Your game opens in the browser right away.
+You pick a game idea (or invent your own). You write a prompt, or ask Termi to help write one. Termi builds the game with you. Your game opens in the browser and updates after every prompt.
 
-You can make dodge games, platform games, pixel art, dance music, virtual pets, adventure stories, quizzes, your own web page, and talking characters. If you change your mind, type `undo` and the last change is gone. When something works, you earn badges.
+There are 30 ready game ideas plus "Build my own idea". When you finish, Termi can run a short test pass and suggest one last improvement. Games save in your local library on this computer.
+
+Want to get better at prompting? Open **Learn AI**. Six short lessons teach you how to boss your AI helper. Each one earns a badge, and you can replay them any time.
 
 Termi is a computer program, an AI tool. It is not a person. A grown-up sets it up first.
-
-Not sure what to say first? Type `/quest` inside any project. Termi walks you through a real build, step by step, with a ready idea at every step. Press Enter to use it, or type your own. Finish a quest and you earn the Quest Hero badge.
-
-Want to get good at building with AI? Type `termi learn`. Six short lessons teach you how to be the boss of your AI helper. Each one earns a badge, and you can replay them any time.
 
 Ready? Ask a grown-up to read the next part.
 
@@ -37,7 +35,7 @@ Please read [SAFETY.md](SAFETY.md) before handing the keyboard to your kid. It e
 - Node.js 20.19 or newer: https://nodejs.org
 - macOS, Windows, or Linux
 - An AI account you own (one of: a ChatGPT account, a Claude API key, an OpenAI API key, or a Grok API key)
-- About 700 MB of free disk space for the on-device safety checker (recommended, on by default)
+- About 700 MB of free disk space for the on-device safety checker (installed during setup)
 
 If Node is too old, Termi prints a plain message with the download link instead of starting.
 
@@ -58,16 +56,14 @@ To update later, run `termi update` (or `npm install -g termi-kids@latest`). On 
 Run `termi`. The first run starts a setup wizard for a parent or guardian. It takes about five minutes:
 
 1. **Create a grown-up PIN** (at least 4 characters). It guards the grown-up zone. Your kid should not know it.
-2. **Age band and consent.** You pick "Under 13" or "13 or older" and confirm that Termi uses an AI account you own and that you agree to watch how your kid uses it. This consent is recorded in the local safety log.
+2. **Consent.** You confirm that Termi uses an AI account you own and that you agree to watch how your kid uses it. One safety bar applies for every age (no under-13 / over-13 split). Consent is recorded in the local safety log.
 3. **Pick an AI provider.** The default is "ChatGPT sign-in": your browser opens, you sign in to your own ChatGPT account, and no API key is needed. The other options are a Claude API key, an OpenAI API key, or a Grok API key. Grok requires an extra confirmation because the xAI API terms are adults-only (details in SAFETY.md). You can add several providers and choose which one is active.
-4. **Safety checker download.** Termi offers a small safety model (623 MB) that screens every message right on your computer, even with no internet. It is on by default and worth keeping. While it downloads, Termi tells you plainly that basic safety (the local filter plus the online checks) is already running, and asks whether you want to start building now or wait and watch the progress bar. Either way, the checker turns itself on the moment the verified file lands and Termi says so, even mid-session. The download is anonymous (no account or token needed) and resumes if interrupted. Details are in [SAFETY.md](SAFETY.md).
+4. **Safety checker install.** Setup always starts the on-device safety model download (about 623 MB). It screens every message on this computer, even offline. You can wait for the progress bar or keep setting up while it finishes in the background. Basic safety is already on during the download. The download is anonymous and resumes if interrupted. Details are in [SAFETY.md](SAFETY.md).
 5. **Hand the keyboard to your kid.** The kid picks a made-up nickname (Termi asks them not to use their real name) and sees a clear disclosure: "Termi is a computer program, an AI. It is a tool a grown-up set up for you. It is not a person."
 6. **Desktop shortcut.** Termi offers to write a double-clickable launcher on the Desktop (`Termi.command` on macOS, `Termi.bat` on Windows, `Termi.desktop` on Linux) so your kid can come back tomorrow without typing commands.
-7. **Optional first game.** Two keypresses later there is a running game in the browser.
+7. **Optional first game.** The kid can jump straight into **Build a game** (pick an idea or invent one).
 
-If you skip the provider step, Termi runs in offline mode: your kid can still create projects, play them in the preview, undo changes, and browse ideas. The chat shows a kind "ask a grown-up to set up the AI helper" screen.
-
-**If your kid does not know where to start:** every project type has a Build Quest (`/quest` in the chat), a five-step guided build with a ready prompt at each step, and a large idea deck (`/ideas`). Quest steps go through the same safety pipeline as any other message.
+If you skip the provider step, Termi runs in offline mode: your kid can still open the library and Learn AI. Building with the AI helper needs a provider.
 
 ### What keeps your kid safe
 
@@ -87,13 +83,13 @@ Parents get a PIN-gated grown-up zone, a tamper-evident log of every block and s
 
 | Command | What it does |
 |---|---|
-| `termi` | First run: setup wizard. After that: the home menu. |
-| `termi new` | Start a new project. |
-| `termi go [name]` | Open a project and build. With no name, pick from a list. |
-| `termi preview [name]` | Open a project in the browser without the chat. |
-| `termi ideas` | Print fun project ideas. |
-| `termi learn` | Six short, replayable lessons on building with AI. Fully offline, no AI calls. |
+| `termi` | First run: setup wizard. After that: home (Build a game, My games, Learn AI). |
+| `termi new` | Build a game (idea list + prompt loop). |
+| `termi go [name]` | Open a game from your library. With no name, pick from a list. |
+| `termi preview [name]` | Open a game in the browser without the chat. |
+| `termi learn` | Learn AI: six short offline lessons on prompting. |
 | `termi grownups` | The grown-up zone. PIN required. |
+| `termi update` | Update Termi to the latest npm version. |
 | `termi help` | Show the command list. |
 | `termi --version` | Show the version. |
 

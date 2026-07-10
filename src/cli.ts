@@ -21,7 +21,6 @@ import { mascot } from './ui/mascot.js';
 import { style } from './ui/theme.js';
 import { T } from './ui/text.js';
 import type { Settings } from './types.js';
-import { executeIdeas } from './surfaces/commands.js';
 import type { ProjectContext } from './projects/store.js';
 
 export interface BootState {
@@ -50,11 +49,10 @@ export function cliHelp(): string {
   return [
     'How to use Termi:',
     '  termi            open the home menu',
-    '  termi new        start a new project',
-    '  termi go [name]  open a project and build',
-    '  termi preview    watch a project run',
-    '  termi ideas      get fun ideas',
-    '  termi learn      play six short lessons about AI',
+    '  termi new        build a game',
+    '  termi go [name]  open a game from your library',
+    '  termi preview    watch a game run',
+    '  termi learn      Learn AI (prompting lessons)',
     '  termi grownups   grown-up zone (PIN needed)',
     '  termi update     update Termi to the latest version',
     '  termi help       show this help',
@@ -147,24 +145,6 @@ async function routePreview(nameArg: string | undefined, settings: Settings): Pr
   });
 }
 
-async function routeIdeas(settings: Settings): Promise<void> {
-  let scaffoldId = 'games';
-  if (settings.lastProjectSlug !== null) {
-    try {
-      const store = await import('./projects/store.js');
-      const last = store.openProject(settings.lastProjectSlug);
-      if (last !== null) {
-        scaffoldId = last.meta.scaffoldId;
-      }
-    } catch {
-      // Fall back to game ideas.
-    }
-  }
-  await executeIdeas(scaffoldId, (text) => {
-    console.log(text);
-  });
-}
-
 async function route(command: string, rest: string[], settings: Settings): Promise<void> {
   const home = await import('./surfaces/home.js');
   switch (command) {
@@ -173,10 +153,8 @@ async function route(command: string, rest: string[], settings: Settings): Promi
       return;
     }
     case 'new': {
-      const project = await home.runNewProject(settings);
-      if (project !== null) {
-        await home.openChatLoop(project, settings);
-      }
+      const build = await import('./surfaces/buildGame.js');
+      await build.runBuildGame(settings);
       return;
     }
     case 'go': {
@@ -191,7 +169,9 @@ async function route(command: string, rest: string[], settings: Settings): Promi
       return;
     }
     case 'ideas': {
-      await routeIdeas(settings);
+      // Ideas live inside Build a game now.
+      const build = await import('./surfaces/buildGame.js');
+      await build.runBuildGame(settings);
       return;
     }
     case 'learn': {
