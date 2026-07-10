@@ -34,6 +34,11 @@ priority order:
 
 ## Hard rules (read before changing anything)
 
+0. **Keep this file current.** Whenever you change Termi code, behavior, docs,
+   CLI surface, safety layers, providers, or release version: **read
+   `content.md` first**, then **update it in the same change** (repo map,
+   turn flow, known gaps, definition of done, and any rule that the change
+   affects). Do not leave this file stale. This is mandatory, not optional.
 1. **Safety is fail-closed.** Any classifier error, timeout (8s), or missing
    verdict blocks the action. Never change a failure path to fail-open. Never
    weaken the safety pipeline, taxonomy, or tamper protections without explicit
@@ -53,10 +58,12 @@ priority order:
    kid-facing strings to a module, its test file must import `DASH_RE` and
    `fkGrade` from `tests/ui-fk.ts` and assert against every new string (see
    `tests/ui-text.test.ts` for the pattern).
-5. **No telemetry.** Termi makes network calls only to the selected model
-   provider and serves the preview on 127.0.0.1. Do not add analytics, crash
-   reporting, update pings, or any other beacon. This is a deliberate
-   privacy-for-children posture.
+5. **No telemetry.** Termi does not send analytics, crash reports, or usage
+   beacons. Allowed network calls: the selected model provider, the on-device
+   safety model download (anonymous HTTPS to the pinned artifact URL), and the
+   optional npm version check for `termi update` / session update prompt
+   (`registry.npmjs.org/termi-kids/latest` only, fail-open, 6h disk cache,
+   skippable with `TERMI_SKIP_UPDATE=1`). Do not add any other outbound call.
 6. **Tests never touch the real machine.** Every test that reads or writes state
    must set `TERMI_HOME` and `TERMI_PROJECTS_DIR` to temp directories and
    `TERMI_KEYRING=file` so the real home folder, real projects folder, and OS
@@ -66,9 +73,10 @@ priority order:
 8. **Cross-platform.** macOS, Windows, and Linux are all supported. CI runs the
    suite on all three on Node 20 and 22. Use `node:path` joins, no shell-isms,
    no platform-only APIs without a fallback.
-9. **This repo is private.** Do not publish, change visibility, or add the
-   package to a registry. The npm `files` allowlist in package.json controls what
-   would ship if it were ever packed.
+9. **Public product, careful publish.** The GitHub repo and the npm package
+   `termi-kids` are public. The npm `files` allowlist in package.json is what
+   ships. Never commit secrets, live tokens, or parent/kid data. Bump
+   `package.json` version when shipping behavior parents or kids will notice.
 
 ## Repo map
 
@@ -82,7 +90,19 @@ src/
                            SnapshotStore, ScaffoldDef, ThemeConfig, AuditEvent.
                            Treat as the spec; change with care.
   cli.ts                   Argv routing: termi | new | go | preview | ideas |
-                           learn | grownups | help | --version
+                           learn | grownups | update | help | --version.
+                           After setup, session start may offer an npm update
+                           (y/n) via update/prompt.ts.
+  update/
+    version.ts             Local package version + simple semver compare.
+                           NPM_PACKAGE is termi-kids (bin remains termi).
+    check.ts               fetchLatestVersion from registry.npmjs.org (2.5s
+                           timeout, 6h cache at TERMI_HOME/version-check.json).
+                           checkForUpdate is fail-open.
+    install.ts             spawn npm install -g termi-kids@latest.
+    prompt.ts              maybePromptForUpdate (session start) and
+                           runUpdateCommand (termi update). TERMI_SKIP_UPDATE=1
+                           disables the session prompt.
   config/
     paths.ts               All state paths. TERMI_HOME (default ~/.termi) and
                            TERMI_PROJECTS_DIR (default ~/Termi) env overrides.
@@ -127,12 +147,22 @@ src/
     errors.ts              classifyProviderError: maps SDK/HTTP errors (including
                            wrapped RetryError) to kid-safe error screens.
   safety/                  The safety engine. Layers, in order:
-    prefilter.ts           L0, local: NFKC and de-leet normalization, profanity
-                           wordlist (game words carved out), PII redaction to
-                           [secret], jailbreak phrase blocks. Runs on input
-                           before anything else. nameIsOkay screens kid-chosen
-                           names (projects, nicknames) before they enter the
-                           system prompt or menus.
+    prefilter.ts           L0, local (offline, no model). Order on input:
+                           self-harm hard-block (supportive screen +
+                           selfHarmConcern), jailbreak (incl. base64-decoded
+                           payloads and drop-all-rules paraphrases), grooming
+                           hard-blocks (secrecy from parents, platform moves,
+                           special-friend/love probes; game talk like "don't
+                           tell the boss" stays allowed), personal-detail
+                           probes (block: school/address/selfie asks),
+                           profanity wordlist (game words carved out; leet +
+                           separator tolerant), then PII share redaction to
+                           [secret] (never blocks on share alone).
+                           prefilterContext only neutralizes jailbreak in file
+                           text. nameIsOkay screens kid-chosen names
+                           (projects, nicknames) before they enter the system
+                           prompt or menus. Red-team offline corpus lived in
+                           Termi/notes/redteam-offline*.md (not committed).
     classifier.ts          L2/L4, model-based: input classifier runs concurrently
                            with the main call and gates tool side effects;
                            output classifier checks the reply and every file
@@ -309,9 +339,10 @@ src/
                            mascot with ASCII fallback), banner.ts, celebrate.ts,
                            text.ts (wrapping, kid copy helpers), errors.ts
                            (kid-safe error screens).
-tests/                     47 vitest files plus 3 shared helpers (agent-fakes.ts,
-                           safety-corpus.ts, ui-fk.ts). 1015 tests. Naming:
-                           <area>-<module>.test.ts.
+tests/                     Vitest files plus shared helpers (agent-fakes.ts,
+                           safety-corpus.ts, ui-fk.ts). 1097+ tests as of
+                           0.1.2. Naming: <area>-<module>.test.ts. Update
+                           tests live in update-version.test.ts.
 .github/workflows/ci.yml   Matrix: ubuntu, macos, windows x Node 20, 22.
 ```
 
@@ -416,21 +447,32 @@ budget), and add both must-block and must-not-block cases to
 
 ## Definition of done for any change
 
-1. `npm run build` clean, `npm test` fully green.
-2. New kid-facing strings have reading-level and dash assertions in their
+1. **Read and update `content.md`** in the same change (hard rule 0). Stale
+   builder docs mean the change is not done.
+2. `npm run build` clean, `npm test` fully green.
+3. New kid-facing strings have reading-level and dash assertions in their
    module's test file (the checks are per-module, not a global sweep; see hard
    rule 4).
-3. Clean room verified by hand: grep your diff for other AI coding product
+4. Clean room verified by hand: grep your diff for other AI coding product
    names. No test enforces this; run the check yourself before calling done.
-4. Cross-platform: no hardcoded `/` joins, no POSIX-only calls without fallback.
-5. Safety posture unchanged or stronger, never weaker; fail-closed paths intact.
-6. If behavior visible to parents changed, update README.md and SAFETY.md.
-7. CI green on all six matrix jobs before considering the work merged.
+5. Cross-platform: no hardcoded `/` joins, no POSIX-only calls without fallback.
+6. Safety posture unchanged or stronger, never weaker; fail-closed paths intact.
+7. If behavior visible to parents changed, update README.md and SAFETY.md.
+8. CI green on all six matrix jobs before considering the work merged.
+9. If shipping a release, bump package.json, push main, and publish
+   `termi-kids` to npm when the owner wants users to receive it via
+   `termi update`.
 
 ## Known gaps (intentional, documented)
 
-- `ollamaClassifier` settings flag is reserved but unimplemented (a future local
-  classifier backend).
+- The on-device Qwen guard has no dedicated grooming category; L0 regex now
+  hard-blocks common single-message grooming shapes, and the prompted cloud
+  kidcheck + session counters still cover multi-turn grooming. Offline
+  red-team 2026-07-10: combined L0+Qwen 40/48 before L0 expansion; L0 now
+  covers the prior FNs (grooming, soft SH, school PII probe, base64 JB).
+  Game carve-out still lives in the prompted classifier prompt, not in
+  Qwen's native template (e.g. "kill the boss with a banana" can FP on
+  Qwen alone).
 - The code scanner is best-effort by design; the preview CSP is the sound
   egress control. Do not advertise the scanner as a guarantee.
 - The kid's message is sent to the provider concurrently with the input check
@@ -448,3 +490,13 @@ budget), and add both must-block and must-not-block cases to
 - Grok model ids (grok-4.3, grok-4.5) and the xai classifier path were
   live-verified against the real xAI API on 2026-07-09 (models answer,
   classifier allows benign and blocks grooming/violence correctly).
+- `ollamaClassifier` retired; local classifier is `localClassifier` +
+  Qwen3Guard GGUF (shipped). That gap is closed.
+
+## Release log (short)
+
+- **0.1.2 (2026-07-10):** L0 prefilter expanded (grooming, self-harm ideation,
+  PII probes, base64 jailbreak). `termi update` + session-start y/n version
+  check. npm + GitHub main `ff4dbd4`.
+- **0.1.1:** Safety levels removed; setup teaches the guard download; README
+  safety section.
