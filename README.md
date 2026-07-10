@@ -27,6 +27,7 @@ Please read [SAFETY.md](SAFETY.md) before handing the keyboard to your kid. It e
 - Node.js 20.19 or newer: https://nodejs.org
 - macOS, Windows, or Linux
 - An AI account you own (one of: a ChatGPT account, a Claude API key, an OpenAI API key, or a Grok API key)
+- About 700 MB of free disk space for the on-device safety checker (recommended, on by default)
 
 If Node is too old, Termi prints a plain message with the download link instead of starting.
 
@@ -52,9 +53,10 @@ Run `termi`. The first run starts a setup wizard for a parent or guardian. It ta
 2. **Age band and consent.** You pick "Under 13" or "13 or older" and confirm that Termi uses an AI account you own and that you agree to watch how your kid uses it. This consent is recorded in the local safety log.
 3. **Pick an AI provider.** The default is "ChatGPT sign-in": your browser opens, you sign in to your own ChatGPT account, and no API key is needed. The other options are a Claude API key, an OpenAI API key, or a Grok API key. Grok requires an extra confirmation because the xAI API terms are adults-only (details in SAFETY.md). You can add several providers and choose which one is active.
 4. **Pick a safety level.** Strict is the default and the right choice for most kids.
-5. **Hand the keyboard to your kid.** The kid picks a made-up nickname (Termi asks them not to use their real name) and sees a clear disclosure: "Termi is a computer program, an AI. It is a tool a grown-up set up for you. It is not a person."
-6. **Desktop shortcut.** Termi offers to write a double-clickable launcher on the Desktop (`Termi.command` on macOS, `Termi.bat` on Windows, `Termi.desktop` on Linux) so your kid can come back tomorrow without typing commands.
-7. **Optional first game.** Two keypresses later there is a running game in the browser.
+5. **Safety checker download.** Termi offers a small safety model (623 MB) that screens every message right on your computer, even with no internet. It is on by default and worth keeping. The download runs in the background: setup continues, your kid can start building right away, the home menu shows a progress bar, and the checker turns itself on the moment the verified file lands. An interrupted download resumes on the next start. Details are in [SAFETY.md](SAFETY.md).
+6. **Hand the keyboard to your kid.** The kid picks a made-up nickname (Termi asks them not to use their real name) and sees a clear disclosure: "Termi is a computer program, an AI. It is a tool a grown-up set up for you. It is not a person."
+7. **Desktop shortcut.** Termi offers to write a double-clickable launcher on the Desktop (`Termi.command` on macOS, `Termi.bat` on Windows, `Termi.desktop` on Linux) so your kid can come back tomorrow without typing commands.
+8. **Optional first game.** Two keypresses later there is a running game in the browser.
 
 If you skip the provider step, Termi runs in offline mode: your kid can still create projects, play them in the preview, undo changes, and browse ideas. The chat shows a kind "ask a grown-up to set up the AI helper" screen.
 
@@ -93,7 +95,7 @@ Inside the build chat, these slash commands work:
 
 Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, `badges`, `learn`, `quest`, and `quit` work on their own, no slash needed, and `exit`, `stop`, `bye`, and `leave` also quit. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
 
-In the grown-up zone you can add, switch, or remove providers, change the safety level, pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives. Removing a provider deletes its saved key or sign-in from this computer.
+In the grown-up zone you can add, switch, or remove providers, change the safety level, manage the on-device safety checker (turn it on or off, download or remove its model file), pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives. Removing a provider deletes its saved key or sign-in from this computer.
 
 ### The nine project types
 
@@ -137,4 +139,4 @@ See "Your data and how to remove Termi" in [SAFETY.md](SAFETY.md) for the exact 
 
 ## Disclaimer
 
-Termi is a personal, educational project provided as-is, without warranty of any kind. It connects to AI services using accounts that you, the parent or guardian, own and control. AI output is unpredictable; the safety layers reduce risk but cannot eliminate it, and children should use Termi with adult supervision. Termi is an independent project and is not affiliated with, endorsed by, or sponsored by OpenAI, Anthropic, xAI, or any other AI provider. Use at your own risk.
+Termi is free and open-source software, released under the MIT License and provided as-is, without warranty of any kind, express or implied. It is a personal, educational project. All use is at the user's own risk and sole responsibility: you, the parent or guardian who installs and configures Termi, are responsible for how it is set up, which AI accounts it connects to, and how children in your care use it. AI output is unpredictable; the safety layers reduce risk but cannot eliminate it, and children should use Termi with adult supervision. The authors and contributors accept no liability for any claim, damages, or other losses arising from the use of this software, as set out in the MIT License. Termi is an independent project and is not affiliated with, endorsed by, or sponsored by OpenAI, Anthropic, xAI, the Qwen team, or any other AI provider.

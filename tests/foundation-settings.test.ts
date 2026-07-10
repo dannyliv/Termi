@@ -40,7 +40,7 @@ describe('defaultSettings', () => {
     expect(d.installId).toBe('');
     expect(d.ageBand).toBe('under13');
     expect(d.xaiParentAck).toBe(false);
-    expect(d.ollamaClassifier).toBe(false);
+    expect(d.localClassifier).toBe(true);
     expect(d.consentAttestedAt).toBeNull();
     expect(d.modelAlias).toBe('zippy');
     expect(d.version).toBe(1);
@@ -68,6 +68,17 @@ describe('loadSettings / saveSettings', () => {
     expect(result.firstRun).toBe(false);
     expect(result.settings).toEqual(saved);
     expect(result.settings.kidNickname).toBe('rocketfox');
+  });
+
+  it('upgrades an older envelope: ollamaClassifier out, localClassifier on', () => {
+    const old = { ...defaultSettings() } as Record<string, unknown>;
+    delete old.localClassifier;
+    old.ollamaClassifier = false;
+    saveSettings(old as unknown as Parameters<typeof saveSettings>[0]);
+    const result = loadSettings();
+    expect(result.tampered).toBe(false);
+    expect(result.settings.localClassifier).toBe(true);
+    expect('ollamaClassifier' in result.settings).toBe(false);
   });
 
   it('generates an installId on first save and keeps it after', () => {

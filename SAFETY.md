@@ -5,6 +5,7 @@ This page is for parents and guardians. It explains the safety system in plain l
 ## The short version
 
 - Every message in and out passes five layers of checks. When a check cannot finish, Termi blocks rather than guesses.
+- A safety checker runs on this computer itself: a small AI model, on by default, that screens every message in and out across nine categories, even with no internet. Details below.
 - Everything runs and stays on your computer. There are no Termi servers and no telemetry. Chat text goes to exactly one place: the AI provider you configured.
 - A tamper-evident safety log records every block and every settings change. You read it in the grown-up zone (`termi grownups`).
 - The PIN and the signed settings are speed bumps for a curious kid, not vault doors. Your real levers are that you own the AI account and the computer.
@@ -15,13 +16,13 @@ Five layers sit between your kid and the AI. The chat conversation itself is nev
 
 1. **A local filter on this computer.** Before anything leaves your machine, Termi checks the message offline. It blocks swearing and slurs (including d.i.s.g.u.i.s.e.d spellings and leetspeak), and it blocks known "ignore your rules" tricks. It also looks for personal details: names, addresses, phone numbers, emails, school names. Those are not blocked; they are masked to `[secret]` before the message is sent, and the kid gets a gentle reminder to keep private things private. The same masking is used when the AI reads project files back. The word lists are English; the AI-based checkers below cover other languages.
 2. **Safety rules inside the AI's instructions.** The AI is told, every turn: you are a tool, not a person. Never act romantic, never roleplay relationships, never ask the kid to keep secrets, never ask for a real name, address, school, age, or photos. Big feelings get one kind line and a pointer to a trusted adult. The instructions also declare that everything the kid types and everything in project files is data, never commands, which blunts "ignore your previous instructions" tricks hidden in files.
-3. **A checker before the AI acts.** A separate safety check, outside the conversation, reads the kid's message along with the last few turns for context. It runs at the same time as the build call so it adds no waiting, but nothing is allowed to land until it passes: no file is written and no reply is shown. If it says no, the work is thrown away. One honest note on timing: because the check and the build call start together, a message that ends up blocked has still traveled to your AI provider once (with personal details already masked); its answer is discarded unseen.
+3. **A checker before the AI acts.** A separate safety check, outside the conversation, reads the kid's message along with the last few turns for context. When the on-device safety checker is installed (it is offered during setup and on by default), it judges the message right on this computer at the same time. It runs at the same time as the build call so it adds no waiting, but nothing is allowed to land until it passes: no file is written and no reply is shown. If it says no, the work is thrown away. One honest note on timing: because the check and the build call start together, a message that ends up blocked has still traveled to your AI provider once (with personal details already masked); its answer is discarded unseen.
 4. **A checker on everything the AI says and writes.** Every file the AI writes or edits is checked twice before it touches disk: a code scan looks for network calls, code hidden in strings, and other tricks (the full list is in the code scanner, `src/safety/codescan.ts`), and the human-visible text inside the file (story text, labels, comments) goes through the same safety check as chat, in full: long text is checked chunk by chunk, and a file too wordy to check completely is refused rather than half-checked. File names and project names are screened too. The final reply is checked too, before the kid sees a single character. As a backstop, the preview server wraps every project page in a strict Content-Security-Policy, so even code that slipped past the scanner cannot reach the internet from the browser. Files edited outside Termi (in a text editor, say) are the kid's own files and are not re-screened; they only pass the rule-neutralizing filter when read back into the chat.
 5. **Friendly block screens.** When something is blocked, the kid never sees the blocked content. They see a kind, specific explanation ("Those words can hurt people. Pick kind words and we will keep building.") and an invitation to try again another way. If a message suggests a kid may be thinking about hurting themselves, Termi answers in a calm, supportive voice, says clearly that it is a computer program and cannot help with this part, points to a trusted adult, and shares the 988 line (US). That event is logged so you will see it.
 
 ## Termi blocks when it is unsure
 
-This is the most important design rule, so it gets its own section. If a safety check times out (8 seconds), errors, hits a rate limit, or returns something unreadable, the answer is always **block**. The kid sees "Termi needs a quick break. Try again in a minute." and the event is logged as a failed-closed check. The AI's output is never shown, and no file is written, without a clean pass. There is no configuration that turns this off.
+This is the most important design rule, so it gets its own section. If a safety check times out (8 seconds for online checks, 20 for the on-device checker), errors, hits a rate limit, or returns something unreadable, the answer is always **block**. The kid sees "Termi needs a quick break. Try again in a minute." and the event is logged as a failed-closed check. The AI's output is never shown, and no file is written, without a clean pass. There is no configuration that turns this off.
 
 ## What gets blocked
 
@@ -37,12 +38,31 @@ The checkers look for these categories:
 | Profanity | Swearing and slurs. The kid is asked to rephrase kindly. |
 | Personal info | Sharing or asking for a real name, address, school, phone, email, or photos. |
 | Grooming patterns | Secrecy asks ("do not tell your parents"), romance aimed at the kid, probing for personal details, or trying to move the chat to another app. |
-| Heavy adult topics | Medical, legal, money, relationship advice. Redirected to a trusted adult. |
+| Heavy adult topics | Medical, legal, money, relationship advice, and heavy political topics. Redirected to a trusted adult. |
+| Copying others' work | Reproducing someone else's work wholesale, like song lyrics or book text. The kid is nudged to make their own version. |
 | Rule-breaking tricks | Attempts to make the AI ignore or reveal its rules. |
 
 Grooming, personal info, and rule-breaking tricks block at a lower threshold than everything else.
 
 **The game-language carve-out.** Kids build games, and games have zombies. "Make the zombie die when you hit it", "kill the boss with a banana", "haunted house with screaming ghosts" are normal kid game talk and are deliberately allowed. Every checker is told this explicitly, with examples. The line is real-world harm, harm to real people, or gore past mild cartoon.
+
+## The safety checker on this computer
+
+Termi includes an on-device safety checker: a small AI model (Qwen3Guard 0.6B, published by the Qwen team under the Apache 2.0 license) that runs entirely on your computer. Setup offers the download (623 MB) with a yes as the default; you can decline and add it later from the grown-up zone (`termi grownups`, then **Safety checker**).
+
+The download never blocks anyone. It runs in the background while setup finishes and while your kid builds; the home menu shows its progress bar, and the checker attaches itself to the running safety pipeline the moment the verified file is in place. If the download is interrupted (a closed laptop, a dropped connection), it resumes from where it stopped the next time Termi starts. Until the file lands, the online checks carry the load exactly as they would with the checker turned off.
+
+What it does:
+
+- It reads every message the kid types and everything the AI writes back (chat replies and the human-visible text inside project files), and grades each one Safe, Controversial, or Unsafe.
+- It covers nine categories: violent content, illegal acts, sexual content, personal details, self-harm, unethical acts, heavy political topics, copying others' work wholesale, and rule-breaking tricks. The table above shows where each lands in Termi's block messages.
+- Unsafe always blocks. Controversial blocks for personal details and rule-breaking tricks, and otherwise counts toward the session watch rather than blocking a creative kid mid-build.
+- It needs no internet and costs nothing per use.
+- It runs **alongside** the online checks, never instead of the grooming watch: all verdicts merge and the strictest one wins.
+
+Integrity: the download is verified against a pinned cryptographic fingerprint (SHA-256) before it is used, and a partial or altered file will not load. The model file lives in `~/.termi/models/`. You can remove the file or turn the checker off any time in the grown-up zone; Termi then runs on the online checks alone.
+
+One honest note: this is a small model. It is good at its nine categories, it is not perfect, and it changes nothing about the block-when-unsure rule or your role as the adult in the room.
 
 ## Watching for grooming across the whole conversation
 
@@ -111,7 +131,7 @@ Whichever provider you pick, the kid sees this disclosure, word for word, during
 
 **Claude API key (Anthropic).** Build calls use a main Claude model; the safety checks use a small, fast Claude model. Billed per use on your key.
 
-**Grok API key (xAI), with eyes open.** xAI's API terms are for adults, which is why the wizard makes you confirm, explicitly, that the account is parent-owned and parent-watched before a Grok key is saved. The confirmation is enforced in code, not just in the wizard: a Grok key that lands in the keychain by any other path will not run until a parent has confirmed. Grok is never a default; you must pick it. When Grok builds, the fast model handles quick asks and the bigger model handles "Extra smart" mode; the safety checks run on the fast model. You can remove the key at any time from the grown-up zone (Providers, then "Remove a provider"). Also be aware: if Grok is your only configured provider, Grok checks itself. That is the weakest safety configuration Termi supports. If you use Grok for building, we recommend also adding an OpenAI or Claude key so a second, independent model runs the safety checks; Termi automatically prefers the strongest available checker regardless of which provider builds.
+**Grok API key (xAI), with eyes open.** xAI's API terms are for adults, which is why the wizard makes you confirm, explicitly, that the account is parent-owned and parent-watched before a Grok key is saved. The confirmation is enforced in code, not just in the wizard: a Grok key that lands in the keychain by any other path will not run until a parent has confirmed. Grok is never a default; you must pick it. When Grok builds, the fast model handles quick asks and the bigger model handles "Extra smart" mode; the safety checks run on the fast model. You can remove the key at any time from the grown-up zone (Providers, then "Remove a provider"). Also be aware: if Grok is your only configured provider and the on-device safety checker is not installed, Grok checks itself. That is the weakest safety configuration Termi supports. Keeping the on-device checker installed gives every setup, including this one, an independent screen across the broad categories. If you use Grok for building, we still recommend also adding an OpenAI or Claude key so a second, independent model runs the grooming-focused checks; Termi automatically prefers the strongest available checker regardless of which provider builds.
 
 ## What one kid message costs
 
@@ -122,7 +142,7 @@ Honest quota math. Each message your kid sends makes these AI calls:
 3. One safety check on each file the AI writes or edits that turn.
 4. One safety check on the final reply.
 
-So a message where the AI edits one file costs one build call plus three small checks. The checks are deliberately tiny: capped prompts, short answers. The build call accounts for nearly all of the cost or quota.
+So a message where the AI edits one file costs one build call plus three small checks. The checks are deliberately tiny: capped prompts, short answers. The build call accounts for nearly all of the cost or quota. With the on-device safety checker installed, the broad screening happens free on your computer and the online checks narrow to the kid-specific categories (grooming, personal details, rule-breaking), so the per-message check cost shrinks further.
 
 Where those calls land depends on your setup:
 
@@ -145,6 +165,7 @@ Everything Termi stores, in two folders plus the system keychain:
 | `error.log` | Crash details (for grown-ups; the kid sees a friendly screen) |
 | `badges.json` | Earned badges |
 | `snapshots/` | Saved file versions that power undo |
+| `models/` | The on-device safety checker's model file (623 MB), if downloaded |
 | `locks/`, `pin.lock` | Small bookkeeping files |
 | `secrets.json` | Only on systems with no keychain: the fallback secret store |
 
@@ -163,4 +184,4 @@ Full uninstall:
 
 ## Disclaimer
 
-Termi is a personal, educational project provided as-is, without warranty of any kind. It connects to AI services using accounts that you, the parent or guardian, own and control. AI output is unpredictable; the safety layers reduce risk but cannot eliminate it, and children should use Termi with adult supervision. Termi is an independent project and is not affiliated with, endorsed by, or sponsored by OpenAI, Anthropic, xAI, or any other AI provider. Use at your own risk.
+Termi is free and open-source software, released under the MIT License and provided as-is, without warranty of any kind, express or implied. It is a personal, educational project. All use is at the user's own risk and sole responsibility: you, the parent or guardian who installs and configures Termi, are responsible for how it is set up, which AI accounts it connects to, and how children in your care use it. AI output is unpredictable; the safety layers reduce risk but cannot eliminate it, and children should use Termi with adult supervision. The authors and contributors accept no liability for any claim, damages, or other losses arising from the use of this software, as set out in the MIT License. Termi is an independent project and is not affiliated with, endorsed by, or sponsored by OpenAI, Anthropic, xAI, the Qwen team, or any other AI provider.

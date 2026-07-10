@@ -14,6 +14,7 @@ import { ensureDirs, errorLogPath } from './config/paths.js';
 import { loadSettings } from './config/settings.js';
 import { startPreview } from './preview/server.js';
 import { appendAudit } from './safety/audit.js';
+import { guardModelReady } from './safety/modelstore.js';
 import { renderBanner } from './ui/banner.js';
 import { installGlobalHandlers, renderCrash } from './ui/errors.js';
 import { mascot } from './ui/mascot.js';
@@ -255,6 +256,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     },
     logPath: errorLogPath(),
   });
+
+  // Resume the safety-checker download in the background when it is enabled
+  // but its model file is not on disk yet (declined-then-enabled, an
+  // interrupted transfer, or a wizard quit mid-download). Never blocks.
+  if (settings.localClassifier && !guardModelReady()) {
+    const { ensureGuardFetch } = await import('./safety/guarddownload.js');
+    void ensureGuardFetch();
+  }
 
   await route(command, argv.slice(1), settings);
 }

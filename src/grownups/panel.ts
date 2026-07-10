@@ -15,6 +15,7 @@ import { hasPin, resetPin, verifyPin } from '../config/pin.js';
 import {
   auditLogPath,
   authJsonPath,
+  modelsDir,
   projectsDir,
   settingsPath,
   termiHome,
@@ -23,6 +24,8 @@ import { defaultSettings, loadSettings, saveSettings } from '../config/settings.
 import { moderationKeyAccessor } from '../providers/index.js';
 import { modelLabel } from '../providers/models.js';
 import { appendAudit, verifyAuditChain } from '../safety/audit.js';
+import { ensureGuardFetch, guardProgressBar } from '../safety/guarddownload.js';
+import { GUARD_MODEL, guardModelReady, removeGuardModel } from '../safety/modelstore.js';
 import { style } from '../ui/theme.js';
 import { T } from '../ui/text.js';
 import type { ModelAlias, ProviderId, SafetyLevel, Settings } from '../types.js';
@@ -378,6 +381,7 @@ function showDataScreen(): void {
       `Kid projects: ${projectsDir()}`,
       `Audit log: ${auditLogPath()}`,
       `Sign-in tokens: ${authJsonPath()}`,
+      `Safety model: ${modelsDir()}`,
       `Keychain service: ${KEYCHAIN_SERVICE}`,
       `Keychain accounts: ${accounts.join(', ')}`,
       '',
@@ -386,6 +390,67 @@ function showDataScreen(): void {
     ].join('\n'),
     'Your data',
   );
+}
+
+/** One-line status for the on-device safety checker menu row. */
+export function guardStatusLine(settings: Settings): string {
+  if (!settings.localClassifier) {
+    return 'off';
+  }
+  return guardModelReady() ? 'on' : 'on, model not downloaded';
+}
+
+/** Manage the on-device safety checker: toggle, download, remove. */
+async function guardMenu(settings: Settings): Promise<Settings> {
+  const ready = guardModelReady();
+  p.note(
+    [
+      `${GUARD_MODEL.name} screens every message on this computer,`,
+      'even with no internet. It checks: violence, illegal acts, sexual content,',
+      'personal details, self-harm, unethical acts, heavy political topics,',
+      'copying others\' work, and rule-breaking attempts.',
+      `Model file: ${ready ? 'downloaded' : `not downloaded (${GUARD_MODEL.displaySize})`}`,
+    ].join('\n'),
+    'Safety checker',
+  );
+  const options: { value: string; label: string }[] = [];
+  if (!settings.localClassifier) {
+    options.push({ value: 'on', label: 'Turn it on' });
+  } else {
+    options.push({ value: 'off', label: 'Turn it off' });
+  }
+  if (!ready) {
+    options.push({ value: 'download', label: `Download the model (${GUARD_MODEL.displaySize})` });
+  } else {
+    options.push({ value: 'remove', label: 'Remove the model file' });
+  }
+  options.push({ value: 'back', label: 'Back' });
+  const pick = await p.select<string>({ message: 'Safety checker', options });
+  if (p.isCancel(pick) || pick === 'back') {
+    return settings;
+  }
+  if (pick === 'on' || pick === 'off') {
+    const next = saveSettings({ ...settings, localClassifier: pick === 'on' });
+    audit('settings_change', `local classifier ${pick}`);
+    return next;
+  }
+  if (pick === 'remove') {
+    removeGuardModel();
+    audit('settings_change', 'local classifier model removed');
+    p.log.info('Removed the model file. Downloads again any time.');
+    return settings;
+  }
+  // Joins the background fetch when one is already running (the shared
+  // manager is single-flight), otherwise starts it, and shows a live bar.
+  const spin = p.spinner();
+  spin.start(`${T.wizard.guardDownloading} ${guardProgressBar()}`);
+  const ticker = setInterval(() => {
+    spin.message(`${T.wizard.guardDownloading} ${guardProgressBar()}`);
+  }, 250);
+  const ok = await ensureGuardFetch();
+  clearInterval(ticker);
+  spin.stop(ok ? T.wizard.guardReady : T.wizard.guardFailed);
+  return settings;
 }
 
 /** The PIN-gated grown-ups panel. */
@@ -410,6 +475,7 @@ export async function runPanel(): Promise<void> {
       options: [
         { value: 'providers', label: 'Providers (add or switch)' },
         { value: 'safety', label: `Safety level (now: ${settings.safetyLevel})` },
+        { value: 'guard', label: `Safety checker on this computer (${guardStatusLine(settings)})` },
         { value: 'speed', label: `Model speed (now: ${modelLabel(settings.modelAlias)})` },
         { value: 'usage', label: 'Usage and quota note' },
         { value: 'audit', label: 'Safety log' },
@@ -423,6 +489,8 @@ export async function runPanel(): Promise<void> {
     }
     if (pick === 'providers') {
       settings = await providersMenu(settings);
+    } else if (pick === 'guard') {
+      settings = await guardMenu(settings);
     } else if (pick === 'safety') {
       const level = await p.select<SafetyLevel>({
         message: T.wizard.safetyPick,

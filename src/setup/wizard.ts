@@ -13,6 +13,8 @@ import { setSecret } from '../auth/keychain.js';
 import { hasPin, markSetupComplete, setPin } from '../config/pin.js';
 import { defaultSettings, loadSettings, saveSettings } from '../config/settings.js';
 import { appendAudit } from '../safety/audit.js';
+import { ensureGuardFetch } from '../safety/guarddownload.js';
+import { guardModelReady } from '../safety/modelstore.js';
 import { nameIsOkay } from '../safety/prefilter.js';
 import { scaffoldById } from '../projects/scaffolds/index.js';
 import { renderBanner } from '../ui/banner.js';
@@ -382,6 +384,29 @@ async function safetyStep(settings: Settings): Promise<Settings> {
   return { ...settings, safetyLevel: level };
 }
 
+/**
+ * Offers the on-device safety checker download. Default is yes: the
+ * classifier setting ships on, and this step starts fetching its model file
+ * in the background so setup (and building) never waits on 623 MB. The
+ * pipeline hot-attaches the checker the moment the verified file lands; the
+ * home menu shows the progress bar until then. Declining turns the setting
+ * off; a failed or interrupted download resumes on the next start.
+ */
+async function localGuardStep(settings: Settings): Promise<Settings> {
+  if (guardModelReady()) {
+    return { ...settings, localClassifier: true };
+  }
+  const wants = ensure(await p.confirm({ message: T.wizard.guardOffer, initialValue: true }));
+  if (!wants) {
+    p.log.info(T.wizard.guardDeclined);
+    audit('settings_change', 'local classifier off (declined in setup)');
+    return { ...settings, localClassifier: false };
+  }
+  void ensureGuardFetch();
+  p.log.info(T.wizard.guardBackground);
+  return { ...settings, localClassifier: true };
+}
+
 async function kidNicknameStep(settings: Settings): Promise<Settings> {
   console.log(mascot('happy'));
   console.log(T.wizard.kidHello);
@@ -477,6 +502,7 @@ export async function runWizard(): Promise<void> {
   settings = await consentStep(settings);
   settings = await providerLoop(settings);
   settings = await safetyStep(settings);
+  settings = await localGuardStep(settings);
   settings = saveSettings(settings);
   markSetupComplete();
 

@@ -39,9 +39,20 @@ export function defaultSettings(): Settings {
     modelAlias: 'zippy',
     safetyLevel: 'strict',
     xaiParentAck: false,
-    ollamaClassifier: false,
+    localClassifier: true,
     lastProjectSlug: null,
   };
+}
+
+/**
+ * Fills fields added after a settings file was written and drops retired
+ * ones. Runs after the MAC check (the MAC covers the envelope as written).
+ * Older envelopes predate localClassifier: absent means on, the default.
+ */
+export function normalizeSettings(stored: Settings): Settings {
+  const raw = stored as Settings & { ollamaClassifier?: boolean };
+  const { ollamaClassifier: _retired, ...kept } = raw;
+  return { ...kept, localClassifier: raw.localClassifier ?? true };
 }
 
 /** Stable stringify: object keys sorted recursively, array order preserved. */
@@ -128,7 +139,7 @@ export function loadSettings(): LoadSettingsResult {
     return { settings: defaultSettings(), tampered: true, firstRun: false };
   }
 
-  return { settings: envelope.settings, tampered: false, firstRun: false };
+  return { settings: normalizeSettings(envelope.settings), tampered: false, firstRun: false };
 }
 
 /**

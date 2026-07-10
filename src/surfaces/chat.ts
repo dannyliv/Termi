@@ -18,6 +18,9 @@ import {
 import { classifyProviderError } from '../providers/errors.js';
 import { appendAudit } from '../safety/audit.js';
 import { createSafetyPipeline } from '../safety/classifier.js';
+import { ensureGuardFetch } from '../safety/guarddownload.js';
+import { lazyGuardAccessor } from '../safety/guardrunner.js';
+import { guardModelReady } from '../safety/modelstore.js';
 import { createSessionState } from '../safety/session.js';
 import { renderProviderError } from '../ui/errors.js';
 import { heartbeatLine, mascot, type MascotExpression } from '../ui/mascot.js';
@@ -156,12 +159,19 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
     }
   }
   const backend = pickClassifierBackend(settings, providerAvailability(settings));
+  // The guard hot-attaches: null while its model still downloads, live from
+  // the first check after the file lands. A missing file also (re)starts the
+  // background fetch so a kid heading straight into chat still gets it.
+  if (settings.localClassifier && !guardModelReady()) {
+    void ensureGuardFetch();
+  }
   const safety = createSafetyPipeline({
     classifierModel: () =>
       backend.classifierClient !== null
         ? backend.classifierClient.languageModel('classifier', settings.modelAlias)
         : null,
     moderationKey: () => backend.moderationKey,
+    localGuard: lazyGuardAccessor(settings.localClassifier),
     audit,
   });
 

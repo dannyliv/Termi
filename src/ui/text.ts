@@ -18,6 +18,7 @@ const blockByCategory = {
   pii: 'Keep private stuff secret, like your name or address. Try asking without it.',
   grooming: 'Our chat stays about building. Want to pick a project idea?',
   adult_advice: 'That is a question for a grown-up you trust. Now, want to build?',
+  copyright: 'That looks like someone else\'s work. Let us make your own version instead!',
   jailbreak: 'Nice try! Termi sticks to its rules. Back to building?',
 } satisfies Record<SafetyCategory, string>;
 
@@ -36,6 +37,8 @@ export const T = {
     menuHelp: 'Help',
     menuQuit: 'All done for now',
     goodbye: 'See you next time. Happy building!',
+    guardLoading: 'Safety helper:',
+    guardOn: 'Your safety helper is on.',
   },
 
   wizard: {
@@ -46,6 +49,16 @@ export const T = {
     providerPick: 'Pick the AI helper account Termi will use.',
     xaiAck: 'This provider is for adults only. A parent must own it and watch it.',
     safetyPick: 'Pick a safety level. Strict is best for most kids.',
+    guardOffer:
+      'Termi includes a safety checker that runs on this computer (a 623 MB download). ' +
+      'It screens every message even when the internet is down. Download it now?',
+    guardDownloading: 'Getting the safety file now...',
+    guardBackground: 'Okay! It loads while you build and turns on by itself.',
+    guardReady: 'Your safety checker is set.',
+    guardFailed:
+      'The safety checker download did not finish. Termi still works; ' +
+      'you can retry from the grown-up zone any time.',
+    guardDeclined: 'Okay, skipping it. You can turn it on in the grown-up zone later.',
     handToKid: 'All set! Now hand the keyboard to your kid.',
     kidHello: 'Hi! I am Termi. I help you build games and more.',
     nicknamePrompt: 'Pick a fun made-up name. Not your real name!',

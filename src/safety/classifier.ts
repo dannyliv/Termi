@@ -28,6 +28,7 @@ import {
   prefilterContext as prefilterContextImpl,
   prefilterInput as prefilterInputImpl,
 } from './prefilter.js';
+import type { LocalGuardClient } from './guardrunner.js';
 import { bumpCounters, groomingEscalation, windowText } from './session.js';
 import {
   blockMessage,
@@ -59,9 +60,11 @@ export interface SafetyPipelineDeps {
   classifierModel: () => unknown | null;
   /** OpenAI API key for the free moderation endpoint, or null. */
   moderationKey: () => string | null;
+  /** On-device classifier, or null when off or its model is not downloaded. */
+  localGuard?: () => LocalGuardClient | null;
   fetchImpl?: typeof fetch;
   audit: (e: AuditEvent) => void;
-  /** Per remote call. Default 8000. */
+  /** Per remote call. Default 8000. The guard bounds its own calls. */
   timeoutMs?: number;
 }
 
@@ -284,11 +287,33 @@ export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {
       const tasks: Promise<ClassifierVerdict>[] = [];
       const key = deps.moderationKey();
       const model = deps.classifierModel() as LanguageModel | null;
+      const guard = deps.localGuard?.() ?? null;
       if (key) {
         tasks.push(withTimeout(moderationCheck(key, text, fetchImpl), timeoutMs));
       }
+      if (guard) {
+        // The on-device guard judges every chunk across its full taxonomy,
+        // for input and output alike. On output checks it also sees the
+        // kid's last message, the exchange shape it was trained on. No
+        // withTimeout wrapper here: the runner bounds its own load and each
+        // generation, and chunks queue behind one another, so an outer timer
+        // started at task creation would fail-closed on long files for
+        // nothing more than waiting their turn.
+        const lastKid =
+          [...state.recentTurns].reverse().find((turn) => turn.role === 'kid')?.text ?? '';
+        for (const chunk of chunks) {
+          tasks.push(
+            direction === 'input'
+              ? guard.classifyInput(chunk)
+              : guard.classifyOutput(lastKid, chunk),
+          );
+        }
+      }
       if (model) {
-        const scope = key ? 'kidcheck' : 'full';
+        // With a broad-taxonomy backend in play (moderation endpoint or the
+        // on-device guard), the prompted check narrows to the kid-specific
+        // categories the broad backends do not model: grooming, pii, jailbreak.
+        const scope = key || guard ? 'kidcheck' : 'full';
         for (const chunk of chunks) {
           const composedWindow = `${window}\nTEXT TO JUDGE:\n${chunk}`;
           tasks.push(withTimeout(promptedCheck(model, direction, composedWindow, scope), timeoutMs));
