@@ -27,9 +27,10 @@ priority order:
    Anthropic, OpenAI, and xAI (Grok) API keys are also supported. Grok is a
    full first-class provider: wizard entry with an enforced adults-only
    parent acknowledgment, model speed picker (grok-4.3 zippy, grok-4.5
-   smart), classifier fallback, and error mapping. Model ids were verified
-   against docs.x.ai on 2026-07-09; no live-key E2E has run since the
-   grok-4.5 addition (no xAI key on the dev machine).
+   smart), classifier fallback, and error mapping. Live-verified against
+   the real xAI API on 2026-07-09: both model ids answer, and the safety
+   classifier ran correctly on grok-4.3 (benign allowed, grooming and
+   violence blocked with the right categories).
 
 ## Hard rules (read before changing anything)
 
@@ -390,6 +391,6 @@ budget), and add both must-block and must-not-block cases to
 - Audit-append failures are swallowed after the block is enforced; the block
   itself always stands.
 - The self-harm support copy points to the 988 line, which is US-only.
-- Grok model ids (grok-4.3, grok-4.5) were verified against docs.x.ai on
-  2026-07-09, but no live xAI E2E has run since grok-4.5 was added. Verify
-  with a real key before shipping xai changes.
+- Grok model ids (grok-4.3, grok-4.5) and the xai classifier path were
+  live-verified against the real xAI API on 2026-07-09 (models answer,
+  classifier allows benign and blocks grooming/violence correctly).
