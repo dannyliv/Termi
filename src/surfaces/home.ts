@@ -316,11 +316,19 @@ export async function openChatLoop(project: ProjectContext, settings: Settings):
     if (exit !== 'new') {
       return;
     }
-    const next = await runNewProject(settings);
-    if (next === null) {
+    // /new always opens Build a game (blank shell + ideas), never the
+    // multi-scaffold stock-project picker.
+    try {
+      const build = await import('./buildGame.js');
+      const next = await build.runBuildGame(settings);
+      if (next === null) {
+        return;
+      }
+      current = next;
+    } catch {
+      p.log.warn('Build a game is taking a nap. Try again soon.');
       return;
     }
-    current = next;
   }
 }
 

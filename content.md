@@ -498,6 +498,8 @@ budget), and add both must-block and must-not-block cases to
 
 ## Release log (short)
 
+- **0.2.1 (2026-07-10):** /new and chat exit "new" always open Build a game
+  (blank shell), never multi-scaffold stock starters; help/SAFETY copy match.
 - **0.2.0 (2026-07-10):** Simplified kid product: Build a game (own idea + 30
   HTML ideas, prompt help, live preview, done/improve + polish), Learn AI,
   My games library. No age-band UI; one safety bar. Setup always installs

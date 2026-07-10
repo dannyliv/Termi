@@ -117,7 +117,7 @@ Termi is built so that the developer never touches your family's data, because t
 
 - **100% local.** No Termi servers exist. No telemetry, no analytics, no crash reporting, no account with Termi. Nothing phones home.
 - **Chat goes to one place.** The kid's messages (after personal-info masking) and the project files go only to the AI provider you configured, to generate the code and run the safety checks. No other network calls are made on the kid's behalf.
-- **You are the account holder.** Termi has no relationship with your child. You bring your own AI account, you attest to your kid's age band during setup, and your consent is recorded, timestamped, in the local safety log. The AI provider's privacy policy governs what happens to text sent to it; that is a relationship between you and the provider you chose.
+- **You are the account holder.** Termi has no relationship with your child. You bring your own AI account, you agree during setup to watch how your kid uses it, and your consent is recorded, timestamped, in the local safety log. There is one safety bar for every age (no under-13 / over-13 setup choice). The AI provider's privacy policy governs what happens to text sent to it; that is a relationship between you and the provider you chose.
 - **Personal info is kept out of the AI.** The local filter masks names, addresses, phones, emails, and school names before sending. On "My Page" website projects, personal touches like a name are typed directly into the page in the browser preview and saved in the browser's local storage on this computer; they never pass through the chat, so they never reach the AI provider at all.
 - **Kid projects are plain files** in `~/Termi`, readable and yours forever.
 

@@ -167,7 +167,7 @@ export const T = {
     'Type /ideas if you feel stuck.',
     'Type /badges to see what you earned.',
     'Type /help to see every command.',
-    'Type /new to start something fresh.',
+    'Type /new to build a new game.',
     'Type /done when you finish your project.',
   ],
 

@@ -100,7 +100,7 @@ Inside the build chat, these slash commands work:
 | `/preview` | Open the project in the browser. |
 | `/undo` | Take back the last change. |
 | `/redo` | Bring a change back. |
-| `/new` | Start a fresh project. |
+| `/new` | Build a new game (idea list + blank shell). |
 | `/ideas` | Get fun ideas. |
 | `/badges` | See earned badges. |
 | `/learn` | Play the short AI lessons. |
