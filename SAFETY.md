@@ -175,7 +175,7 @@ The system keychain holds entries under the service name **`termi-cli`** with th
 
 Full uninstall:
 
-1. Remove the command: `npm rm -g termi`, then delete the cloned repository folder.
+1. Remove the command: `npm rm -g termi-kids` (if you installed from a clone instead, `npm rm -g termi`, then delete the cloned folder).
 2. Delete `~/.termi`.
 3. Delete `~/Termi`, or keep it for the projects.
 4. Delete the keychain entries: on macOS open Keychain Access and search `termi-cli`; on Windows use Credential Manager; on Linux use your keyring app (for example Seahorse), or just delete `~/.termi/secrets.json` if the fallback was in use.

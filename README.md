@@ -33,7 +33,15 @@ If Node is too old, Termi prints a plain message with the download link instead 
 
 ### Install
 
-This is a private repository, so install from a clone (your GitHub account needs access to it):
+One command:
+
+```
+npm install -g termi-kids
+```
+
+Then run `termi`. If npm reports a permission error, prefix the install with `sudo` on macOS and Linux, or run the terminal as administrator on Windows. To remove it later, run `npm rm -g termi-kids` (full cleanup steps are in SAFETY.md).
+
+To hack on Termi instead, install from a clone:
 
 ```
 git clone https://github.com/dannyliv/Termi.git
@@ -42,8 +50,6 @@ npm install
 npm run build
 npm link
 ```
-
-After `npm link`, the `termi` command works from any folder. If `npm link` reports a permission error, prefix it with `sudo` on macOS and Linux, or run the terminal as administrator on Windows. To remove it later, run `npm rm -g termi` (full cleanup steps are in SAFETY.md).
 
 ### First run: the setup wizard
 
