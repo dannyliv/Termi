@@ -51,6 +51,8 @@ npm install -g termi-kids
 
 Then run `termi`. If npm reports a permission error, prefix the install with `sudo` on macOS and Linux, or run the terminal as administrator on Windows. To remove it later, run `npm rm -g termi-kids` (full cleanup steps are in SAFETY.md).
 
+To update later, run `termi update` (or `npm install -g termi-kids@latest`). On each new session, Termi checks for a newer version and asks whether to update (y/n). Set `TERMI_SKIP_UPDATE=1` to silence the check.
+
 ### First run: the setup wizard
 
 Run `termi`. The first run starts a setup wizard for a parent or guardian. It takes about five minutes:

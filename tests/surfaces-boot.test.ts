@@ -41,7 +41,14 @@ describe('decideBoot', () => {
 describe('cliHelp', () => {
   it('lists every command', () => {
     const text = cliHelp();
-    for (const cmd of ['termi new', 'termi go', 'termi preview', 'termi ideas', 'termi grownups']) {
+    for (const cmd of [
+      'termi new',
+      'termi go',
+      'termi preview',
+      'termi ideas',
+      'termi grownups',
+      'termi update',
+    ]) {
       expect(text).toContain(cmd);
     }
   });

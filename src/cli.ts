@@ -56,6 +56,7 @@ export function cliHelp(): string {
     '  termi ideas      get fun ideas',
     '  termi learn      play six short lessons about AI',
     '  termi grownups   grown-up zone (PIN needed)',
+    '  termi update     update Termi to the latest version',
     '  termi help       show this help',
     '  termi --version  show the version',
   ].join('\n');
@@ -203,6 +204,11 @@ async function route(command: string, rest: string[], settings: Settings): Promi
       await panel.runPanel();
       return;
     }
+    case 'update': {
+      const update = await import('./update/prompt.js');
+      await update.runUpdateCommand();
+      return;
+    }
     default: {
       console.log(`Hmm, "${command}" is not a Termi command.`);
       console.log(cliHelp());
@@ -220,6 +226,13 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
   if (command === 'help' || command === '--help' || command === '-h') {
     console.log(cliHelp());
+    return;
+  }
+  // Update works without the wizard so a parent can refresh a broken install.
+  if (command === 'update') {
+    ensureDirs();
+    const update = await import('./update/prompt.js');
+    await update.runUpdateCommand();
     return;
   }
 
@@ -268,6 +281,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   if (settings.localClassifier && !guardModelReady()) {
     const { ensureGuardFetch } = await import('./safety/guarddownload.js');
     void ensureGuardFetch();
+  }
+
+  // Returning sessions: offer an update when npm has a newer version.
+  // Skipped during setup, tests, and TERMI_SKIP_UPDATE=1.
+  if (!decision.runWizard) {
+    try {
+      const update = await import('./update/prompt.js');
+      await update.maybePromptForUpdate();
+    } catch {
+      // Never block boot on the update check.
+    }
   }
 
   await route(command, argv.slice(1), settings);
