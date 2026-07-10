@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/dannyliv/Termi/main/assets/termi-hero.png" alt="Termi, a friendly robot popping out of a terminal window surrounded by pixel game elements" width="720">
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/termi-kids"><img src="https://img.shields.io/npm/v/termi-kids" alt="npm version"></a>
+  <a href="https://github.com/dannyliv/Termi/actions/workflows/ci.yml"><img src="https://github.com/dannyliv/Termi/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+</p>
+
 # Termi
 
 Termi is a friendly robot that helps you build things on a real computer.
