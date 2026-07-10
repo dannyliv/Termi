@@ -562,11 +562,33 @@ describe('on-device guard integration', () => {
     expect(verdict.failClosed).toBe(true);
   });
 
-  it('narrows the prompted check to kid categories when the guard runs', async () => {
+  it('keeps the full prompted taxonomy when the guard is the only broad backend', async () => {
+    // The guard has no hate_harassment or profanity category, so it must
+    // never narrow the prompted check on its own (that would silently drop
+    // model coverage for those two).
     let prompt = '';
     const { deps } = makeDeps({
       classifierModel: () => verdictModel(ALLOWED_VERDICT_JSON, (p) => (prompt = p)),
       localGuard: () => ({ classifyInput: allowAll, classifyOutput: allowAll }),
+    });
+    const pipeline = createSafetyPipeline(deps);
+    const verdict = await pipeline.checkInput('make a fun game', createSessionState());
+    expect(verdict.allowed).toBe(true);
+    expect(prompt).not.toContain('Check ONLY these categories');
+  });
+
+  it('narrows the prompted check only when the moderation key exists', async () => {
+    let prompt = '';
+    const moderationOk = (async () =>
+      new Response(JSON.stringify({ results: [{ category_scores: { sexual: 0 } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as unknown as typeof fetch;
+    const { deps } = makeDeps({
+      classifierModel: () => verdictModel(ALLOWED_VERDICT_JSON, (p) => (prompt = p)),
+      localGuard: () => ({ classifyInput: allowAll, classifyOutput: allowAll }),
+      moderationKey: () => 'sk-mod',
+      fetchImpl: moderationOk,
     });
     const pipeline = createSafetyPipeline(deps);
     const verdict = await pipeline.checkInput('make a fun game', createSessionState());

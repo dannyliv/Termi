@@ -136,6 +136,27 @@ describe('guard model store', () => {
     expect(fs.readFileSync(guardModelPath())).toEqual(payload);
   });
 
+  it('a corrupted partial fails the whole-file digest even when the resume is honest', async () => {
+    const payload = Buffer.from('0123456789abcdef');
+    const artifact = artifactFor(payload);
+    const half = payload.length / 2;
+    fs.mkdirSync(modelsDir(), { recursive: true });
+    // Wrong bytes on disk (same size a resume expects), honest remainder
+    // from the server: only hashing the file as it exists on disk catches it.
+    fs.writeFileSync(guardPartialPath(artifact), Buffer.from('XXXXXXXX'));
+    const rangeFetch: typeof fetch = async (_url, init) => {
+      const range = new Headers(init?.headers).get('range') ?? '';
+      const from = Number(/bytes=(\d+)-/.exec(range)?.[1] ?? 0);
+      return new Response(new Blob([payload.subarray(from)]), { status: 206 });
+    };
+    await expect(downloadGuardModel({ artifact, fetchImpl: rangeFetch })).rejects.toThrow(
+      'digest-mismatch',
+    );
+    expect(fs.existsSync(guardModelPath())).toBe(false);
+    expect(fs.existsSync(guardPartialPath(artifact))).toBe(false);
+    expect(half).toBe(8);
+  });
+
   it('surfaces HTTP failures', async () => {
     const payload = Buffer.from('x');
     await expect(

@@ -148,21 +148,33 @@ src/
                            'reply' feeds grooming counters, 'file' never does.
                            When the on-device guard is available it judges
                            every chunk (input and output) across its full
-                           taxonomy and the prompted check narrows to kidcheck
-                           scope (grooming/pii/jailbreak).
+                           taxonomy as an ADDITIONAL backend. Only the
+                           moderation key narrows the prompted check to
+                           kidcheck scope; the guard never does (it has no
+                           hate_harassment/profanity category, so narrowing
+                           on it would drop coverage).
     localguard.ts          Pure contract for the on-device classifier
                            (Qwen3Guard-Gen-0.6B): exact prompt wrapper
                            reproduced from the model's chat template as
-                           fixed/judged segments, completion parsing
-                           (first Safety/Categories/Refusal lines win),
-                           and the guard-to-Termi category map. Severity:
-                           Unsafe 2 (always blocks), Controversial 1 (blocks
+                           fixed/judged segments, anchored completion parsing
+                           (the FIRST non-empty line must be the Safety line
+                           or it throws and fails closed; Categories/Refusal
+                           read only from the next two lines), sanitizeJudged
+                           defangs template markers, chat-glyph pairs, and
+                           verdict-shaped line prefixes, and the
+                           guard-to-Termi category map. Severity: Unsafe 2
+                           (always blocks), Controversial 1 (blocks
                            pii/jailbreak), Safe 0.
     guardrunner.ts         llama.cpp runtime (node-llama-cpp): lazy singleton
-                           load, one context sequence, calls serialized,
-                           wrapper segments tokenized with special tokens and
-                           judged segments as plain text (token-level
-                           injection impossible), per-call abort timeout.
+                           load (pinned sha256 re-verified on disk before
+                           loadModel, so a same-size swap never runs), one
+                           context sequence, calls serialized, wrapper
+                           segments tokenized with special tokens and judged
+                           segments as plain text (token-level injection
+                           impossible), per-call abort timeout plus a 2x
+                           deadline backstop for native calls that ignore
+                           the signal (a hung call must not freeze the
+                           queue), bounded load deadline.
     modelstore.ts          Pinned GGUF artifact (repo URL, size, sha256).
                            Download streams to a stable .partial file with
                            HTTP range resume (full-file digest still enforced:

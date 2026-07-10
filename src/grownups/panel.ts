@@ -435,10 +435,13 @@ async function guardMenu(settings: Settings): Promise<Settings> {
     return next;
   }
   if (pick === 'remove') {
+    // Removing the file also turns the checker off; otherwise the next
+    // start would silently re-download 623 MB against the parent's intent.
     removeGuardModel();
-    audit('settings_change', 'local classifier model removed');
-    p.log.info('Removed the model file. Downloads again any time.');
-    return settings;
+    const next = saveSettings({ ...settings, localClassifier: false });
+    audit('settings_change', 'local classifier model removed and turned off');
+    p.log.info('Removed the model file and turned the checker off.');
+    return next;
   }
   // Joins the background fetch when one is already running (the shared
   // manager is single-flight), otherwise starts it, and shows a live bar.
