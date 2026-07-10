@@ -19,6 +19,7 @@ import {
   buildGameFirstLabel,
   buildGameIdeaCount,
   buildGameIsOwnFirst,
+  resolvePromptInput,
 } from '../src/surfaces/buildGame.js';
 import { homeMenuOptions } from '../src/surfaces/home.js';
 import { T } from '../src/ui/text.js';
@@ -81,13 +82,20 @@ describe('build game surface wiring', () => {
     expect(buildGameFirstLabel()).toBe('Build my own idea');
   });
 
-  it('obtainPrompt source pre-fills draft so Enter can run without retyping', () => {
-    // Regression: defaultValue alone is applied after validate, so Enter on an
-    // empty field showed "Need a prompt to build" even with a suggested draft.
+  it('resolvePromptInput keeps draft when typing is empty', () => {
+    const draft =
+      'Make a keyboard maze game on a canvas grid. Arrow keys move a square.';
+    expect(resolvePromptInput('', draft)).toBe(draft);
+    expect(resolvePromptInput('   ', draft)).toBe(draft);
+    expect(resolvePromptInput('Custom prompt', draft)).toBe('Custom prompt');
+    expect(resolvePromptInput('', '')).toBeNull();
+  });
+
+  it('obtainPrompt offers Run it for drafts instead of text-only Enter', () => {
     const src = fs.readFileSync(path.join(repoRoot, 'src/surfaces/buildGame.ts'), 'utf8');
-    expect(src).toMatch(/initialValue:\s*draft/);
-    expect(src).toMatch(/\(value \?\? ''\)\.trim\(\) \|\| draft\.trim\(\)/);
-    expect(src).toMatch(/text\.trim\(\) \|\| draft\.trim\(\)/);
+    expect(src).toMatch(/value: 'run'/);
+    expect(src).toMatch(/label: 'Run it'/);
+    expect(src).toMatch(/if \(action === 'run'\)/);
   });
 });
 

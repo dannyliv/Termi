@@ -119,6 +119,15 @@ async function gatherHelpAnswers(idea: GameIdea): Promise<string[] | null> {
   return answers;
 }
 
+/**
+ * Merge typed input with an optional draft. Empty typing keeps the draft so
+ * kids can run a suggested prompt without retyping it.
+ */
+export function resolvePromptInput(typed: string, draft: string): string | null {
+  const resolved = typed.trim() || draft.trim();
+  return resolved.length > 0 ? resolved : null;
+}
+
 async function obtainPrompt(idea: GameIdea): Promise<string | null> {
   const path = await p.select<'write' | 'help' | 'seed'>({
     message: 'How do you want to tell Termi what to build?',
@@ -143,27 +152,43 @@ async function obtainPrompt(idea: GameIdea): Promise<string | null> {
       return null;
     }
     draft = suggestPromptFromAnswers(idea, answers);
-    p.note(draft, 'Suggested prompt');
   }
 
-  // clack: initialValue pre-fills the field; defaultValue is only applied
-  // AFTER validate. Empty Enter with only defaultValue fails validate, so
-  // we pre-fill and also accept empty when a draft already exists.
+  // When we already have a draft, do not force a long single-line text field.
+  // clack text() is unreliable for long initialValue (looks like a placeholder
+  // and Enter can fail validate). Offer a clear Run vs Edit choice first.
+  if (draft.length > 0) {
+    p.note(draft, 'Suggested prompt');
+    const action = await p.select<'run' | 'edit'>({
+      message: 'Use this prompt?',
+      options: [
+        { value: 'run', label: 'Run it' },
+        { value: 'edit', label: 'Edit it first' },
+      ],
+      initialValue: 'run',
+    });
+    if (p.isCancel(action)) {
+      return null;
+    }
+    if (action === 'run') {
+      return draft;
+    }
+  }
+
   const text = await p.text({
-    message: path === 'write' ? 'Type your prompt.' : 'Edit the prompt, or press Enter to run it.',
+    message: draft.length > 0 ? 'Edit your prompt.' : 'Type your prompt.',
     initialValue: draft.length > 0 ? draft : undefined,
     defaultValue: draft.length > 0 ? draft : undefined,
     placeholder: draft.length > 0 ? undefined : 'Make a fun browser game where...',
     validate: (value) => {
-      const resolved = (value ?? '').trim() || draft.trim();
-      return resolved.length > 0 ? undefined : 'Need a prompt to build.';
+      const resolved = resolvePromptInput(value ?? '', draft);
+      return resolved !== null ? undefined : 'Need a prompt to build.';
     },
   });
   if (p.isCancel(text)) {
     return null;
   }
-  const resolved = text.trim() || draft.trim();
-  return resolved.length > 0 ? resolved : null;
+  return resolvePromptInput(text, draft);
 }
 
 function listKidFileSummaries(project: ProjectContext): { relPath: string; content: string }[] {
