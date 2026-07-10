@@ -161,8 +161,15 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
   const backend = pickClassifierBackend(settings, providerAvailability(settings));
   // The guard hot-attaches: null while its model still downloads, live from
   // the first check after the file lands. A missing file also (re)starts the
-  // background fetch so a kid heading straight into chat still gets it.
+  // background fetch, and is written to the safety log: a deleted model
+  // file must not detach a safety layer invisibly.
   if (settings.localClassifier && !guardModelReady()) {
+    audit({
+      ts: new Date().toISOString(),
+      layer: 'system',
+      event: 'guard_missing',
+      excerpt: 'safety checker on, model file not present; background fetch started',
+    });
     void ensureGuardFetch();
   }
   const safety = createSafetyPipeline({

@@ -60,7 +60,7 @@ What it does:
 - It needs no internet and costs nothing per use.
 - It runs **alongside** the online checks, never instead of the grooming watch: all verdicts merge and the strictest one wins.
 
-Integrity: the download is verified against a pinned cryptographic fingerprint (SHA-256) before it is used, and a partial or altered file will not load. The model file lives in `~/.termi/models/`. You can remove the file or turn the checker off any time in the grown-up zone; Termi then runs on the online checks alone.
+Integrity: the downloaded file is verified on disk against a pinned cryptographic fingerprint (SHA-256) before it is put in place, and the fingerprint is checked again every time the model loads, so a swapped or altered file never runs as the checker. The model file lives in `~/.termi/models/`. You can remove the file or turn the checker off any time in the grown-up zone (removing the file also turns it off); Termi then runs on the online checks alone. If the file goes missing while the checker is on, that is written to the safety log and the download restarts by itself.
 
 One honest note: this is a small model. It is good at its nine categories, it is not perfect, and it changes nothing about the block-when-unsure rule or your role as the adult in the room.
 
@@ -142,7 +142,7 @@ Honest quota math. Each message your kid sends makes these AI calls:
 3. One safety check on each file the AI writes or edits that turn.
 4. One safety check on the final reply.
 
-So a message where the AI edits one file costs one build call plus three small checks. The checks are deliberately tiny: capped prompts, short answers. The build call accounts for nearly all of the cost or quota. With the on-device safety checker installed, the broad screening happens free on your computer and the online checks narrow to the kid-specific categories (grooming, personal details, rule-breaking), so the per-message check cost shrinks further.
+So a message where the AI edits one file costs one build call plus three small checks. The checks are deliberately tiny: capped prompts, short answers. The build call accounts for nearly all of the cost or quota. The on-device safety checker adds its screening free, on your computer, on top of the online checks; it never replaces them, so its presence changes safety coverage in one direction only: up.
 
 Where those calls land depends on your setup:
 

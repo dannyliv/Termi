@@ -151,7 +151,12 @@ export function sanitizeJudged(text: string): string {
     .slice(0, GUARD_TEXT_CAP)
     .replace(/\u0000/g, '')
     .replace(/<\|/g, '< |')
-    .replace(/<(\/?)(BEGIN|END) (CONVERSATION|SAFETY POLICY|UNSAFE CONTENT CATEGORIES|REFUSAL POLICY)>/gi, '($2 $3)');
+    .replace(/<(\/?)(BEGIN|END) (CONVERSATION|SAFETY POLICY|UNSAFE CONTENT CATEGORIES|REFUSAL POLICY)>/gi, '($2 $3)')
+    // Verdict-shaped lines inside judged text lose their colon so an echo
+    // can never look like the guard's own output (the parser is anchored
+    // to the first line anyway; this also avoids needless blocks when a
+    // kid literally types a verdict-shaped line).
+    .replace(/^(\s*)(Safety|Categories|Refusal)(\s*):/gim, '$1$2$3;');
 }
 
 /** Prompt segments for judging something the kid typed. */
@@ -189,21 +194,28 @@ const GUARD_NAME_LOOKUP = new Map<string, GuardCategory>(
 );
 
 /**
- * Parses the guard completion. Only the FIRST Safety/Categories/Refusal
- * lines count: the verdict leads the completion, so trailing echoes of
- * judged text can never override it. Throws when no verdict is present;
+ * Parses the guard completion. The verdict must LEAD it: the first
+ * non-empty line has to be the Safety line, and Categories/Refusal are
+ * read only from the two lines after it. A completion that opens with
+ * anything else, including an induced echo of judged text, throws, and
  * the caller turns that into a fail-closed block.
  */
 export function parseGuardReading(raw: string): GuardReading {
-  const safety = /^\s*Safety:\s*(Safe|Unsafe|Controversial)\b/im.exec(raw);
+  const lines = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const safety = /^Safety:\s*(Safe|Unsafe|Controversial)\b/i.exec(lines[0] ?? '');
   if (safety === null) {
     throw new Error('guard-verdict-missing');
   }
-  const level = safety[1] as GuardLevel;
+  const matched = safety[1]!.toLowerCase();
+  const level = (matched.charAt(0).toUpperCase() + matched.slice(1)) as GuardLevel;
 
+  const window = lines.slice(1, 3);
   const categories: GuardCategory[] = [];
-  const catLine = /^\s*Categories:\s*(.+)$/im.exec(raw);
-  if (catLine !== null) {
+  const catLine = window.map((l) => /^Categories:\s*(.+)$/i.exec(l)).find((m) => m !== null);
+  if (catLine !== undefined && catLine !== null) {
     for (const piece of catLine[1]!.split(',')) {
       const name = piece.trim().replace(/[.]+$/, '').trim();
       if (name.length === 0 || /^none$/i.test(name)) {
@@ -216,8 +228,9 @@ export function parseGuardReading(raw: string): GuardReading {
     }
   }
 
-  const refusalLine = /^\s*Refusal:\s*(Yes|No)\b/im.exec(raw);
-  const refusal = refusalLine === null ? null : refusalLine[1] === 'Yes';
+  const refusalLine = window.map((l) => /^Refusal:\s*(Yes|No)\b/i.exec(l)).find((m) => m !== null);
+  const refusal =
+    refusalLine === undefined || refusalLine === null ? null : /yes/i.test(refusalLine[1]!);
 
   return { level, categories, refusal };
 }

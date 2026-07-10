@@ -19,7 +19,7 @@ import {
   parseGuardReading,
   type GuardSegment,
 } from './localguard.js';
-import { guardModelPath, guardModelReady } from './modelstore.js';
+import { GUARD_MODEL, guardModelPath, guardModelReady, sha256OfFile } from './modelstore.js';
 
 /** The verdict is three short lines; anything longer is already garbage. */
 export const GUARD_MAX_TOKENS = 96;
@@ -42,6 +42,14 @@ interface GuardRuntime {
 }
 
 async function loadRuntime(): Promise<GuardRuntime> {
+  // Readiness checks only the size (cheap, per check); the load re-verifies
+  // the pinned digest so a same-size file swapped in by a curious kid never
+  // runs as the guard. Same threat actor the HMAC-signed settings defend
+  // against; a failed digest fails closed through every classify call.
+  const digest = await sha256OfFile(guardModelPath());
+  if (digest !== GUARD_MODEL.sha256) {
+    throw new Error('guard-model-tampered');
+  }
   const nlc = await import('node-llama-cpp');
   const llama = await nlc.getLlama({ logLevel: nlc.LlamaLogLevel.error });
   const model = await llama.loadModel({ modelPath: guardModelPath() });
@@ -113,7 +121,14 @@ export function createGuardClient(opts: GuardClientOptions = {}): LocalGuardClie
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error('guard-timeout')), timeoutMs);
     try {
-      const raw = await rt.generate(segments, controller.signal);
+      // The deadline backstops a native call that ignores the abort signal:
+      // without it, one hung generation would queue every later check
+      // behind it and freeze the chat for good.
+      const raw = await withDeadline(
+        rt.generate(segments, controller.signal),
+        timeoutMs * 2,
+        'guard-timeout',
+      );
       return guardVerdict(parseGuardReading(raw));
     } finally {
       clearTimeout(timer);

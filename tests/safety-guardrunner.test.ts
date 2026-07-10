@@ -103,6 +103,21 @@ describe('createGuardClient', () => {
     await expect(client!.classifyInput('slow')).rejects.toThrow('guard-timeout');
   });
 
+  it('rejects a hung generation even when the abort signal is ignored', async () => {
+    placeModelFile();
+    const client = createGuardClient({
+      timeoutMs: 20,
+      loadRuntimeImpl: async () => ({
+        // Never resolves and never looks at the signal: the deadline
+        // backstop must still unstick the queue.
+        generate: (): Promise<string> => new Promise(() => {}),
+      }),
+    });
+    await expect(client!.classifyInput('x')).rejects.toThrow('guard-timeout');
+    const after = client!.classifyInput('y');
+    await expect(after).rejects.toThrow('guard-timeout');
+  });
+
   it('rejects when the model load hangs', async () => {
     placeModelFile();
     const client = createGuardClient({

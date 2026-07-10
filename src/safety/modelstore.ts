@@ -66,19 +66,24 @@ export function guardPartialPath(artifact: GuardArtifact = GUARD_MODEL): string 
   return `${path.join(modelsDir(), artifact.fileName)}.partial`;
 }
 
-async function hashFileInto(hash: crypto.Hash, filePath: string): Promise<void> {
+/** Streams a whole file through sha256. The disk contents are the truth. */
+export async function sha256OfFile(filePath: string): Promise<string> {
+  const hash = crypto.createHash('sha256');
   await new Promise<void>((resolve, reject) => {
     const stream = fs.createReadStream(filePath);
     stream.on('data', (chunk) => hash.update(chunk as Buffer));
     stream.on('end', resolve);
     stream.on('error', reject);
   });
+  return hash.digest('hex');
 }
 
 /**
  * Downloads and verifies the model, resuming a previous partial download
- * when the server supports byte ranges. The digest always covers the whole
- * file: resumed bytes are re-hashed from disk before new bytes stream in.
+ * when the server supports byte ranges. Verification happens against the
+ * file ON DISK after the transfer, immediately before the rename, so bytes
+ * written by anything else (a concurrent Termi process racing the same
+ * partial path) can never slip an unverified file into place.
  *
  * Failure behavior, by cause:
  * - interrupted transfer: the partial file stays for the next resume.
@@ -117,16 +122,10 @@ export async function downloadGuardModel(opts: DownloadGuardOptions = {}): Promi
     offset = 0;
   }
 
-  const hash = crypto.createHash('sha256');
-  if (offset > 0) {
-    await hashFileInto(hash, partialPath);
-  }
-
   let written = offset;
   try {
     const source = Readable.fromWeb(res.body as import('node:stream/web').ReadableStream);
     source.on('data', (chunk: Buffer) => {
-      hash.update(chunk);
       written += chunk.length;
       opts.onProgress?.(written, artifact.bytes);
     });
@@ -139,15 +138,17 @@ export async function downloadGuardModel(opts: DownloadGuardOptions = {}): Promi
     throw err instanceof Error ? err : new Error(String(err));
   }
 
-  if (written < artifact.bytes) {
-    // Stream ended early. Keep the partial; the next attempt resumes.
+  // Judge the file as it exists on disk, not the bytes this process saw.
+  const diskSize = fs.statSync(partialPath).size;
+  if (diskSize < artifact.bytes) {
+    // Short. Keep the partial; the next attempt resumes.
     throw new Error('guard-download-failed:interrupted');
   }
-  if (written > artifact.bytes) {
+  if (diskSize > artifact.bytes) {
     fs.rmSync(partialPath, { force: true });
     throw new Error('guard-download-failed:size-mismatch');
   }
-  const digest = hash.digest('hex');
+  const digest = await sha256OfFile(partialPath);
   if (digest !== artifact.sha256) {
     fs.rmSync(partialPath, { force: true });
     throw new Error('guard-download-failed:digest-mismatch');

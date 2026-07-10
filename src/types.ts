@@ -165,6 +165,7 @@ export interface AuditEvent {
     | 'provider_change'
     | 'consent'
     | 'grooming_flag'
+    | 'guard_missing'
     | 'auth_dead';
   category?: SafetyCategory;
   severity?: 0 | 1 | 2 | 3;

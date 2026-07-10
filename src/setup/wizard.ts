@@ -394,7 +394,9 @@ async function safetyStep(settings: Settings): Promise<Settings> {
  */
 async function localGuardStep(settings: Settings): Promise<Settings> {
   if (guardModelReady()) {
-    return { ...settings, localClassifier: true };
+    // Model already present: keep whatever the parent chose before. A
+    // wizard re-run must not silently flip a deliberate off back to on.
+    return settings;
   }
   const wants = ensure(await p.confirm({ message: T.wizard.guardOffer, initialValue: true }));
   if (!wants) {

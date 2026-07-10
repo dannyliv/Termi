@@ -310,10 +310,13 @@ export function createSafetyPipeline(deps: SafetyPipelineDeps): SafetyPipeline {
         }
       }
       if (model) {
-        // With a broad-taxonomy backend in play (moderation endpoint or the
-        // on-device guard), the prompted check narrows to the kid-specific
-        // categories the broad backends do not model: grooming, pii, jailbreak.
-        const scope = key || guard ? 'kidcheck' : 'full';
+        // Only the moderation endpoint narrows the prompted check to the
+        // kid-specific categories: its taxonomy covers hate and harassment.
+        // The on-device guard does NOT narrow it. The guard has no
+        // hate_harassment or profanity category, so with the guard as the
+        // only broad backend the full prompted scope must keep running or
+        // those two categories would silently lose their model coverage.
+        const scope = key ? 'kidcheck' : 'full';
         for (const chunk of chunks) {
           const composedWindow = `${window}\nTEXT TO JUDGE:\n${chunk}`;
           tasks.push(withTimeout(promptedCheck(model, direction, composedWindow, scope), timeoutMs));

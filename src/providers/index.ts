@@ -376,7 +376,10 @@ export function pickClassifierBackend(
   availability: ClassifierAvailability,
   deps: ProviderDeps = {},
 ): ClassifierBackend {
-  void settings; // Reserved for future toggles (for example a local classifier).
+  // The on-device guard is not chosen here: it is wired straight into the
+  // safety pipeline (localGuard dep) and runs alongside whichever cloud
+  // backends this picker selects. settings stays for future cloud toggles.
+  void settings;
   const readSecret = deps.readSecret ?? getSecret;
   const moderationKey = moderationKeyAccessor(readSecret);
   if (moderationKey !== null) {
