@@ -51,16 +51,6 @@ npm install -g termi-kids
 
 Then run `termi`. If npm reports a permission error, prefix the install with `sudo` on macOS and Linux, or run the terminal as administrator on Windows. To remove it later, run `npm rm -g termi-kids` (full cleanup steps are in SAFETY.md).
 
-To hack on Termi instead, install from a clone:
-
-```
-git clone https://github.com/dannyliv/Termi.git
-cd Termi
-npm install
-npm run build
-npm link
-```
-
 ### First run: the setup wizard
 
 Run `termi`. The first run starts a setup wizard for a parent or guardian. It takes about five minutes:
@@ -148,6 +138,20 @@ Termi's v1 stance is simple: one operating system user account per kid. Settings
 - **"The sign-in stopped working."** The saved ChatGPT sign-in can no longer refresh. Run `termi grownups`, open Providers, and sign in again.
 - **"Termi found changed settings. Safe settings are on now."** The settings file failed its integrity check, so Termi reverted to strict defaults. Review the grown-up zone.
 - **Crashes.** The kid sees a friendly screen; the technical details go to `~/.termi/error.log`.
+
+### Developing Termi
+
+For working on Termi itself (parents installing for a kid never need this):
+
+```
+git clone https://github.com/dannyliv/Termi.git
+cd Termi
+npm install
+npm run build
+npm link
+```
+
+`npm link` puts the development build on your PATH as `termi`; remove it with `npm rm -g termi`. Tests run with `npm test` (vitest, 1000+ tests).
 
 ### Uninstall
 
