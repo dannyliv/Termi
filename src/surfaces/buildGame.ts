@@ -86,7 +86,7 @@ async function pickProjectName(idea: GameIdea): Promise<string | null> {
   const suggested = defaultNameForIdea(idea);
   const typed = await p.text({
     message: 'Name your game.',
-    placeholder: suggested,
+    initialValue: suggested,
     defaultValue: suggested,
     validate: (value) => {
       const trimmed = (value ?? '').trim() || suggested;
@@ -146,17 +146,24 @@ async function obtainPrompt(idea: GameIdea): Promise<string | null> {
     p.note(draft, 'Suggested prompt');
   }
 
+  // clack: initialValue pre-fills the field; defaultValue is only applied
+  // AFTER validate. Empty Enter with only defaultValue fails validate, so
+  // we pre-fill and also accept empty when a draft already exists.
   const text = await p.text({
     message: path === 'write' ? 'Type your prompt.' : 'Edit the prompt, or press Enter to run it.',
-    defaultValue: draft,
-    placeholder: draft || 'Make a fun browser game where...',
-    validate: (value) =>
-      (value ?? '').trim().length > 0 ? undefined : 'Need a prompt to build.',
+    initialValue: draft.length > 0 ? draft : undefined,
+    defaultValue: draft.length > 0 ? draft : undefined,
+    placeholder: draft.length > 0 ? undefined : 'Make a fun browser game where...',
+    validate: (value) => {
+      const resolved = (value ?? '').trim() || draft.trim();
+      return resolved.length > 0 ? undefined : 'Need a prompt to build.';
+    },
   });
   if (p.isCancel(text)) {
     return null;
   }
-  return text.trim();
+  const resolved = text.trim() || draft.trim();
+  return resolved.length > 0 ? resolved : null;
 }
 
 function listKidFileSummaries(project: ProjectContext): { relPath: string; content: string }[] {

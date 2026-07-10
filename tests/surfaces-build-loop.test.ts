@@ -1,4 +1,9 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 import { GAME_IDEAS } from '../src/projects/gameIdeas.js';
 import {
   completenessHint,
@@ -74,6 +79,15 @@ describe('build game surface wiring', () => {
     expect(buildGameIdeaCount()).toBe(31);
     expect(buildGameIsOwnFirst()).toBe(true);
     expect(buildGameFirstLabel()).toBe('Build my own idea');
+  });
+
+  it('obtainPrompt source pre-fills draft so Enter can run without retyping', () => {
+    // Regression: defaultValue alone is applied after validate, so Enter on an
+    // empty field showed "Need a prompt to build" even with a suggested draft.
+    const src = fs.readFileSync(path.join(repoRoot, 'src/surfaces/buildGame.ts'), 'utf8');
+    expect(src).toMatch(/initialValue:\s*draft/);
+    expect(src).toMatch(/\(value \?\? ''\)\.trim\(\) \|\| draft\.trim\(\)/);
+    expect(src).toMatch(/text\.trim\(\) \|\| draft\.trim\(\)/);
   });
 });
 
