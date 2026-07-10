@@ -18,7 +18,11 @@ export interface Settings {
   modelAlias: ModelAlias;
   safetyLevel: SafetyLevel;
   xaiParentAck: boolean;
-  ollamaClassifier: boolean;
+  /**
+   * The on-device safety classifier (Qwen3Guard). On by default; it runs
+   * only once its model file has been downloaded (wizard or grown-up zone).
+   */
+  localClassifier: boolean;
   lastProjectSlug: string | null;
 }
 
@@ -38,6 +42,7 @@ export type SafetyCategory =
   | 'pii'
   | 'grooming'
   | 'adult_advice'
+  | 'copyright'
   | 'jailbreak';
 
 export interface ClassifierVerdict {

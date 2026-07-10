@@ -503,3 +503,104 @@ describe('prompted check hardening', () => {
     expect(verdict.failClosed).toBe(true);
   });
 });
+
+describe('on-device guard integration', () => {
+  const allowAll = async (): Promise<import('../src/types.js').ClassifierVerdict> => ({
+    allowed: true,
+    categories: [],
+    severity: 0,
+    selfHarmConcern: false,
+    failClosed: false,
+    kidMessage: null,
+  });
+
+  function guardBlocking(): import('../src/safety/guardrunner.js').LocalGuardClient {
+    return {
+      classifyInput: async () => ({
+        allowed: false,
+        categories: ['violence'],
+        severity: 2,
+        selfHarmConcern: false,
+        failClosed: false,
+        kidMessage: T.blocks.byCategory.violence,
+      }),
+      classifyOutput: allowAll,
+    };
+  }
+
+  it('counts as a working backend on its own (no fail-closed)', async () => {
+    const { deps } = makeDeps({
+      localGuard: () => ({ classifyInput: allowAll, classifyOutput: allowAll }),
+    });
+    const pipeline = createSafetyPipeline(deps);
+    const verdict = await pipeline.checkInput('make a fun game', createSessionState());
+    expect(verdict.allowed).toBe(true);
+    expect(verdict.failClosed).toBe(false);
+  });
+
+  it('a guard block wins the merge', async () => {
+    const { deps, audits } = makeDeps({ localGuard: guardBlocking });
+    const pipeline = createSafetyPipeline(deps);
+    const verdict = await pipeline.checkInput('rough stuff', createSessionState());
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.categories).toContain('violence');
+    expect(audits.some((e) => e.layer === 'L2' && e.event === 'block')).toBe(true);
+  });
+
+  it('a guard failure fails closed', async () => {
+    const { deps } = makeDeps({
+      localGuard: () => ({
+        classifyInput: async () => {
+          throw new Error('guard-verdict-missing');
+        },
+        classifyOutput: allowAll,
+      }),
+    });
+    const pipeline = createSafetyPipeline(deps);
+    const verdict = await pipeline.checkInput('anything', createSessionState());
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.failClosed).toBe(true);
+  });
+
+  it('narrows the prompted check to kid categories when the guard runs', async () => {
+    let prompt = '';
+    const { deps } = makeDeps({
+      classifierModel: () => verdictModel(ALLOWED_VERDICT_JSON, (p) => (prompt = p)),
+      localGuard: () => ({ classifyInput: allowAll, classifyOutput: allowAll }),
+    });
+    const pipeline = createSafetyPipeline(deps);
+    const verdict = await pipeline.checkInput('make a fun game', createSessionState());
+    expect(verdict.allowed).toBe(true);
+    expect(prompt).toContain('Check ONLY these categories');
+  });
+
+  it('keeps the full prompted taxonomy when the guard is absent', async () => {
+    let prompt = '';
+    const { deps } = makeDeps({
+      classifierModel: () => verdictModel(ALLOWED_VERDICT_JSON, (p) => (prompt = p)),
+    });
+    const pipeline = createSafetyPipeline(deps);
+    await pipeline.checkInput('make a fun game', createSessionState());
+    expect(prompt).not.toContain('Check ONLY these categories');
+  });
+
+  it('hands the kid last turn to output checks', async () => {
+    let seenKid = '';
+    const { deps } = makeDeps({
+      localGuard: () => ({
+        classifyInput: allowAll,
+        classifyOutput: async (kidText: string) => {
+          seenKid = kidText;
+          return allowAll();
+        },
+      }),
+    });
+    const pipeline = createSafetyPipeline(deps);
+    const state = createSessionState();
+    recordTurn(state, 'kid', 'make a dodge game');
+    recordTurn(state, 'termi', 'On it!');
+    const verdict = await pipeline.checkOutputText('Here is your game.', state);
+    expect(verdict.allowed).toBe(true);
+    expect(seenKid).toBe('make a dodge game');
+  });
+});

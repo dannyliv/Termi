@@ -23,7 +23,7 @@ const settings: Settings = {
   modelAlias: 'zippy',
   safetyLevel: 'strict',
   xaiParentAck: false,
-  ollamaClassifier: false,
+  localClassifier: true,
   lastProjectSlug: null,
 };
 

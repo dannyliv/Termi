@@ -12,6 +12,7 @@ import path from 'node:path';
 import * as p from '@clack/prompts';
 import { atomicWriteFileSync, termiHome } from '../config/paths.js';
 import { saveSettings } from '../config/settings.js';
+import { guardFetchState, guardProgressBar } from '../safety/guarddownload.js';
 import { nameIsOkay } from '../safety/prefilter.js';
 import { scaffolds, scaffoldById } from '../projects/scaffolds/index.js';
 import { suggestProjectNames } from '../setup/wizard.js';
@@ -349,6 +350,7 @@ async function loadLastProject(settings: Settings): Promise<LastProject | null> 
 
 /** The home menu loop for a returning kid. */
 export async function showHome(settings: Settings): Promise<void> {
+  let guardWasLoading = false;
   const nickname = settings.kidNickname.trim();
   console.log(mascot('happy'));
   console.log(
@@ -363,6 +365,17 @@ export async function showHome(settings: Settings): Promise<void> {
   }
 
   for (;;) {
+    // A quiet one-liner while the safety checker still downloads, and one
+    // "it is on now" note the first time the menu renders after it lands.
+    const fetchState = guardFetchState();
+    if (settings.localClassifier && fetchState.status === 'downloading') {
+      console.log(style.dim(`${T.home.guardLoading} ${guardProgressBar(fetchState)}`));
+      guardWasLoading = true;
+    } else if (guardWasLoading && fetchState.status === 'ready') {
+      console.log(style.dim(T.home.guardOn));
+      guardWasLoading = false;
+    }
+
     const options: { value: string; label: string }[] = [];
     if (last !== null) {
       options.push({ value: 'continue', label: `Keep building ${last.context.meta.prettyName}` });

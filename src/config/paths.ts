@@ -62,9 +62,14 @@ export function locksDir(): string {
   return path.join(termiHome(), 'locks');
 }
 
+/** Local safety-model files (the on-device classifier). */
+export function modelsDir(): string {
+  return path.join(termiHome(), 'models');
+}
+
 /** Creates every directory Termi needs. Safe to call repeatedly. */
 export function ensureDirs(): void {
-  for (const dir of [termiHome(), projectsDir(), snapshotsDir(), locksDir()]) {
+  for (const dir of [termiHome(), projectsDir(), snapshotsDir(), locksDir(), modelsDir()]) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }

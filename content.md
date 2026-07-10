@@ -136,16 +136,50 @@ src/
     classifier.ts          L2/L4, model-based: input classifier runs concurrently
                            with the main call and gates tool side effects;
                            output classifier checks the reply and every file
-                           write. 8s timeout, any error = block (fail closed).
-                           Long text is judged chunk by chunk (JUDGE_TEXT_CAP
-                           per call), braces in judged text are swapped to
-                           parentheses so an echo cannot forge a verdict, the
-                           verdict budget is CLASSIFIER_MAX_OUTPUT_TOKENS
-                           (roomy, for reasoning models), and identical file
-                           text reuses a session-scoped allow cache (blocks
-                           are never cached). checkOutputText takes a source
-                           tag: 'reply' feeds grooming counters, 'file' never
-                           does.
+                           write. 8s timeout (20s for the on-device guard), any
+                           error = block (fail closed). Long text is judged
+                           chunk by chunk (JUDGE_TEXT_CAP per call), braces in
+                           judged text are swapped to parentheses so an echo
+                           cannot forge a verdict, the verdict budget is
+                           CLASSIFIER_MAX_OUTPUT_TOKENS (roomy, for reasoning
+                           models), and identical file text reuses a
+                           session-scoped allow cache (blocks are never
+                           cached). checkOutputText takes a source tag:
+                           'reply' feeds grooming counters, 'file' never does.
+                           When the on-device guard is available it judges
+                           every chunk (input and output) across its full
+                           taxonomy and the prompted check narrows to kidcheck
+                           scope (grooming/pii/jailbreak).
+    localguard.ts          Pure contract for the on-device classifier
+                           (Qwen3Guard-Gen-0.6B): exact prompt wrapper
+                           reproduced from the model's chat template as
+                           fixed/judged segments, completion parsing
+                           (first Safety/Categories/Refusal lines win),
+                           and the guard-to-Termi category map. Severity:
+                           Unsafe 2 (always blocks), Controversial 1 (blocks
+                           pii/jailbreak), Safe 0.
+    guardrunner.ts         llama.cpp runtime (node-llama-cpp): lazy singleton
+                           load, one context sequence, calls serialized,
+                           wrapper segments tokenized with special tokens and
+                           judged segments as plain text (token-level
+                           injection impossible), per-call abort timeout.
+    modelstore.ts          Pinned GGUF artifact (repo URL, size, sha256).
+                           Download streams to a stable .partial file with
+                           HTTP range resume (full-file digest still enforced:
+                           resumed bytes re-hash from disk), verifies size and
+                           digest, atomic-renames into ~/.termi/models.
+                           Interrupted transfers keep the partial; poisoned
+                           ones (digest/oversize) delete it. guardModelReady
+                           gates the runner; settings key localClassifier
+                           (default true) gates the feature.
+    guarddownload.ts       Single-flight background fetch manager. Kicked off
+                           by the wizard guard step, cli boot, and chat start
+                           when the model is enabled but absent; never blocks.
+                           Observable state renders as a progress bar in the
+                           home menu and the grown-ups panel (which joins the
+                           in-flight fetch instead of double-downloading).
+                           The pipeline hot-attaches via lazyGuardAccessor on
+                           the first check after the file lands.
     taxonomy.ts            Category and severity definitions shared by all
                            layers. parseVerdict takes the LAST parseable JSON
                            object (anti-forgery); the classifier prompt marks
