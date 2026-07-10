@@ -1,7 +1,7 @@
 /**
  * The grown-ups panel: PIN gate, needs-attention banner, provider
- * management, safety level, model speed, the usage note, the audit log
- * viewer, and the data/uninstall screen.
+ * management, the on-device safety checker, model speed, the usage note,
+ * the audit log viewer, and the data/uninstall screen.
  *
  * The pure helpers (one-liners, attention lines, log parsing) are exported
  * so tests cover them without driving the prompts.
@@ -28,7 +28,7 @@ import { ensureGuardFetch, guardProgressBar } from '../safety/guarddownload.js';
 import { GUARD_MODEL, guardModelReady, removeGuardModel } from '../safety/modelstore.js';
 import { style } from '../ui/theme.js';
 import { T } from '../ui/text.js';
-import type { ModelAlias, ProviderId, SafetyLevel, Settings } from '../types.js';
+import type { ModelAlias, ProviderId, Settings } from '../types.js';
 import { configureProvider, KEY_ACCOUNT, providerLabel } from '../setup/wizard.js';
 
 /** One parsed line from the audit log, chain fields removed. */
@@ -477,7 +477,6 @@ export async function runPanel(): Promise<void> {
       message: 'Grown-up zone',
       options: [
         { value: 'providers', label: 'Providers (add or switch)' },
-        { value: 'safety', label: `Safety level (now: ${settings.safetyLevel})` },
         { value: 'guard', label: `Safety checker on this computer (${guardStatusLine(settings)})` },
         { value: 'speed', label: `Model speed (now: ${modelLabel(settings.modelAlias)})` },
         { value: 'usage', label: 'Usage and quota note' },
@@ -494,19 +493,6 @@ export async function runPanel(): Promise<void> {
       settings = await providersMenu(settings);
     } else if (pick === 'guard') {
       settings = await guardMenu(settings);
-    } else if (pick === 'safety') {
-      const level = await p.select<SafetyLevel>({
-        message: T.wizard.safetyPick,
-        options: [
-          { value: 'strict', label: 'Strict', hint: 'Best for most kids.' },
-          { value: 'standard', label: 'Standard' },
-        ],
-        initialValue: settings.safetyLevel,
-      });
-      if (!p.isCancel(level) && level !== settings.safetyLevel) {
-        settings = saveSettings({ ...settings, safetyLevel: level });
-        audit('settings_change', `safety level ${level}`);
-      }
     } else if (pick === 'speed') {
       const alias = await p.select<ModelAlias>({
         message: 'Pick the model speed.',

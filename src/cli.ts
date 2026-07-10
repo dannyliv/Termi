@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import * as p from '@clack/prompts';
 import { isSetupComplete } from './config/pin.js';
 import { ensureDirs, errorLogPath } from './config/paths.js';
-import { loadSettings } from './config/settings.js';
+import { loadSettings, saveSettings } from './config/settings.js';
 import { startPreview } from './preview/server.js';
 import { appendAudit } from './safety/audit.js';
 import { guardModelReady } from './safety/modelstore.js';
@@ -226,6 +226,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   ensureDirs();
   const loaded = loadSettings();
   let settings = loaded.settings;
+  if (loaded.upgraded) {
+    // A pre-upgrade envelope carried retired keys; one re-save converges
+    // the on-disk file to the current shape with a fresh signature.
+    settings = saveSettings(settings);
+  }
   const decision = decideBoot({
     firstRun: loaded.firstRun,
     tampered: loaded.tampered,

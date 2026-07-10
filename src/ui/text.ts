@@ -48,12 +48,18 @@ export const T = {
     consentIntro: 'Termi uses an AI account you own. You agree to watch how your kid uses it.',
     providerPick: 'Pick the AI helper account Termi will use.',
     xaiAck: 'This provider is for adults only. A parent must own it and watch it.',
-    safetyPick: 'Pick a safety level. Strict is best for most kids.',
     guardOffer:
       'Termi includes a safety checker that runs on this computer (a 623 MB download). ' +
       'It screens every message even when the internet is down. Download it now?',
     guardDownloading: 'Getting the safety file now...',
-    guardBackground: 'Okay! It loads while you build and turns on by itself.',
+    guardBackground:
+      'Basic safety is on right now. It gets stronger when the download is done.',
+    guardWaitPick: 'Start building now, or wait for it?',
+    guardStartNow: 'Start now',
+    guardStartNowHint: 'The checker turns on by itself later.',
+    guardWaitHere: 'Wait here',
+    guardWaitHereHint: 'Watch the download finish first.',
+    guardKeepWaiting: 'Still going. Keep waiting?',
     guardReady: 'Your safety checker is set.',
     guardFailed:
       'The safety checker download did not finish. Termi still works; ' +

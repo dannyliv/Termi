@@ -18,7 +18,7 @@ import {
 import { classifyProviderError } from '../providers/errors.js';
 import { appendAudit } from '../safety/audit.js';
 import { createSafetyPipeline } from '../safety/classifier.js';
-import { ensureGuardFetch } from '../safety/guarddownload.js';
+import { consumeGuardReadyNotice, ensureGuardFetch } from '../safety/guarddownload.js';
 import { lazyGuardAccessor } from '../safety/guardrunner.js';
 import { guardModelReady } from '../safety/modelstore.js';
 import { createSessionState } from '../safety/session.js';
@@ -162,7 +162,9 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
   // The guard hot-attaches: null while its model still downloads, live from
   // the first check after the file lands. A missing file also (re)starts the
   // background fetch, and is written to the safety log: a deleted model
-  // file must not detach a safety layer invisibly.
+  // file must not detach a safety layer invisibly. When the download lands
+  // mid-session, the kid hears about it at the next turn (once, shared with
+  // the home menu via consumeGuardReadyNotice).
   if (settings.localClassifier && !guardModelReady()) {
     audit({
       ts: new Date().toISOString(),
@@ -369,6 +371,9 @@ export async function runChat(project: ProjectContext, settings: Settings): Prom
 
   let hintIndex = 0;
   for (;;) {
+    if (consumeGuardReadyNotice()) {
+      p.log.success(T.home.guardOn);
+    }
     const hint = T.hints[hintIndex % T.hints.length] ?? '';
     hintIndex += 1;
     const step = quest !== null ? quest.steps[questStep] : undefined;

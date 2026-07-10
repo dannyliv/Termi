@@ -190,8 +190,16 @@ src/
                            Observable state renders as a progress bar in the
                            home menu and the grown-ups panel (which joins the
                            in-flight fetch instead of double-downloading).
-                           The pipeline hot-attaches via lazyGuardAccessor on
-                           the first check after the file lands.
+                           The wizard tells the parent basic safety is already
+                           on and asks start-now-or-wait; waiting shows the
+                           live bar with escape prompts (60s, then every 10
+                           min). consumeGuardReadyNotice() is a process-wide
+                           one-shot: chat (next turn) and home (next render)
+                           both consume it, so "Your safety helper is on."
+                           prints exactly once. The pipeline hot-attaches via
+                           lazyGuardAccessor on the first check after the
+                           file lands. Download is anonymous (plain HTTPS,
+                           range header only, pinned sha256).
     taxonomy.ts            Category and severity definitions shared by all
                            layers. parseVerdict takes the LAST parseable JSON
                            object (anti-forgery); the classifier prompt marks
@@ -293,7 +301,9 @@ src/
   grownups/panel.ts        PIN-gated parent panel: provider keys (add, switch,
                            and remove; removal deletes the credential and
                            reassigns the active provider via the pure helper
-                           removeProviderFromSettings), safety level, audit
+                           removeProviderFromSettings), the on-device safety
+                           checker (toggle, download with live bar, remove =
+                           also off), model speed, usage note, audit
                            log viewer, usage and cost notes.
   ui/                      theme.ts (colors and ThemeConfig), mascot.ts (robot
                            mascot with ASCII fallback), banner.ts, celebrate.ts,
@@ -419,8 +429,6 @@ budget), and add both must-block and must-not-block cases to
 
 ## Known gaps (intentional, documented)
 
-- `safetyLevel` strict and standard currently behave identically; SAFETY.md says
-  so honestly. Differentiating them is open work.
 - `ollamaClassifier` settings flag is reserved but unimplemented (a future local
   classifier backend).
 - The code scanner is best-effort by design; the preview CSP is the sound

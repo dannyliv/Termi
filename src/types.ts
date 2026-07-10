@@ -4,7 +4,6 @@
  */
 
 export type ProviderId = 'openai-chatgpt' | 'openai-api' | 'anthropic' | 'xai';
-export type SafetyLevel = 'strict' | 'standard';
 export type ModelAlias = 'zippy' | 'smart';
 
 export interface Settings {
@@ -16,7 +15,6 @@ export interface Settings {
   activeProvider: ProviderId | null;
   configuredProviders: ProviderId[];
   modelAlias: ModelAlias;
-  safetyLevel: SafetyLevel;
   xaiParentAck: boolean;
   /**
    * The on-device safety classifier (Qwen3Guard). On by default; it runs

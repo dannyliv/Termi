@@ -92,6 +92,28 @@ describe('ensureGuardFetch', () => {
     expect(guardFetchState().status).toBe('ready');
   });
 
+  it('raises the ready notice exactly once after a background fetch', async () => {
+    const { consumeGuardReadyNotice } = await import('../src/safety/guarddownload.js');
+    const payload = Buffer.from('notice payload');
+    const fetchImpl: typeof fetch = async () => new Response(new Blob([payload]), { status: 200 });
+    expect(consumeGuardReadyNotice()).toBe(false);
+    await expect(ensureGuardFetch({ artifact: artifactFor(payload), fetchImpl })).resolves.toBe(
+      true,
+    );
+    expect(consumeGuardReadyNotice()).toBe(true);
+    expect(consumeGuardReadyNotice()).toBe(false);
+  });
+
+  it('raises no notice when the file was already in place', async () => {
+    const { consumeGuardReadyNotice } = await import('../src/safety/guarddownload.js');
+    fs.mkdirSync(path.dirname(guardModelPath()), { recursive: true });
+    const fd = fs.openSync(guardModelPath(), 'w');
+    fs.ftruncateSync(fd, GUARD_MODEL.bytes);
+    fs.closeSync(fd);
+    await expect(ensureGuardFetch()).resolves.toBe(true);
+    expect(consumeGuardReadyNotice()).toBe(false);
+  });
+
   it('short-circuits to ready when the file already exists', async () => {
     fs.mkdirSync(path.dirname(guardModelPath()), { recursive: true });
     const fd = fs.openSync(guardModelPath(), 'w');

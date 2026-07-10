@@ -1,6 +1,7 @@
 /**
- * The setup wizard: a parent flow (PIN, consent, AI provider, safety level)
- * followed by a kid flow (nickname, AI disclosure, launcher, first game).
+ * The setup wizard: a parent flow (PIN, consent, AI provider, safety
+ * checker) followed by a kid flow (nickname, AI disclosure, launcher,
+ * first game).
  *
  * Pure decision helpers are exported so tests cover the logic without
  * driving the prompts. Cancel anywhere keeps only the steps that finished;
@@ -13,7 +14,7 @@ import { setSecret } from '../auth/keychain.js';
 import { hasPin, markSetupComplete, setPin } from '../config/pin.js';
 import { defaultSettings, loadSettings, saveSettings } from '../config/settings.js';
 import { appendAudit } from '../safety/audit.js';
-import { ensureGuardFetch } from '../safety/guarddownload.js';
+import { ensureGuardFetch, guardProgressBar } from '../safety/guarddownload.js';
 import { guardModelReady } from '../safety/modelstore.js';
 import { nameIsOkay } from '../safety/prefilter.js';
 import { scaffoldById } from '../projects/scaffolds/index.js';
@@ -370,27 +371,15 @@ async function providerLoop(settings: Settings): Promise<Settings> {
   return { ...current, activeProvider: null };
 }
 
-async function safetyStep(settings: Settings): Promise<Settings> {
-  const level = ensure(
-    await p.select<'strict' | 'standard'>({
-      message: T.wizard.safetyPick,
-      options: [
-        { value: 'strict', label: 'Strict', hint: 'Best for most kids.' },
-        { value: 'standard', label: 'Standard' },
-      ],
-      initialValue: 'strict',
-    }),
-  );
-  return { ...settings, safetyLevel: level };
-}
-
 /**
  * Offers the on-device safety checker download. Default is yes: the
  * classifier setting ships on, and this step starts fetching its model file
- * in the background so setup (and building) never waits on 623 MB. The
- * pipeline hot-attaches the checker the moment the verified file lands; the
- * home menu shows the progress bar until then. Declining turns the setting
- * off; a failed or interrupted download resumes on the next start.
+ * in the background. The parent hears, plainly, that basic safety (the
+ * local filter plus the online checks) is already on and that the checker
+ * strengthens it when the download lands, then chooses to start building
+ * now or wait and watch the bar. Either way the pipeline hot-attaches the
+ * checker the moment the verified file is in place. Declining turns the
+ * setting off; a failed or interrupted download resumes on the next start.
  */
 async function localGuardStep(settings: Settings): Promise<Settings> {
   if (guardModelReady()) {
@@ -404,8 +393,49 @@ async function localGuardStep(settings: Settings): Promise<Settings> {
     audit('settings_change', 'local classifier off (declined in setup)');
     return { ...settings, localClassifier: false };
   }
-  void ensureGuardFetch();
+  const fetchDone = ensureGuardFetch();
   p.log.info(T.wizard.guardBackground);
+  const wait = ensure(
+    await p.select<'now' | 'wait'>({
+      message: T.wizard.guardWaitPick,
+      options: [
+        { value: 'now', label: T.wizard.guardStartNow, hint: T.wizard.guardStartNowHint },
+        { value: 'wait', label: T.wizard.guardWaitHere, hint: T.wizard.guardWaitHereHint },
+      ],
+      initialValue: 'now',
+    }),
+  );
+  if (wait === 'wait') {
+    // The wait shows a live bar with periodic escape hatches (after one
+    // minute, then every ten): a slow connection must not trap the parent
+    // in setup when the download finishes fine in the background anyway.
+    const escapeAfterMs = [60_000, 600_000];
+    let escapeIndex = 0;
+    for (;;) {
+      const spin = p.spinner();
+      spin.start(`${T.wizard.guardDownloading} ${guardProgressBar()}`);
+      const ticker = setInterval(() => {
+        spin.message(`${T.wizard.guardDownloading} ${guardProgressBar()}`);
+      }, 250);
+      const budget = escapeAfterMs[Math.min(escapeIndex, escapeAfterMs.length - 1)]!;
+      escapeIndex += 1;
+      const outcome = await Promise.race([
+        fetchDone.then((ok) => (ok ? 'ready' : 'failed')),
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), budget).unref?.()),
+      ]);
+      clearInterval(ticker);
+      if (outcome !== 'timeout') {
+        spin.stop(outcome === 'ready' ? T.wizard.guardReady : T.wizard.guardFailed);
+        break;
+      }
+      spin.stop(`${T.wizard.guardDownloading} ${guardProgressBar()}`);
+      const more = await p.confirm({ message: T.wizard.guardKeepWaiting, initialValue: true });
+      if (p.isCancel(more) || !more) {
+        p.log.info(T.wizard.guardBackground);
+        break;
+      }
+    }
+  }
   return { ...settings, localClassifier: true };
 }
 
@@ -503,7 +533,6 @@ export async function runWizard(): Promise<void> {
   }
   settings = await consentStep(settings);
   settings = await providerLoop(settings);
-  settings = await safetyStep(settings);
   settings = await localGuardStep(settings);
   settings = saveSettings(settings);
   markSetupComplete();

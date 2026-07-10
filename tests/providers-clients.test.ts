@@ -21,7 +21,6 @@ const settings: Settings = {
   activeProvider: null,
   configuredProviders: [],
   modelAlias: 'zippy',
-  safetyLevel: 'strict',
   xaiParentAck: false,
   localClassifier: true,
   lastProjectSlug: null,

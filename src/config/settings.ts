@@ -24,6 +24,11 @@ export interface LoadSettingsResult {
   tampered: boolean;
   /** True only when no settings file exists and setup never completed. */
   firstRun: boolean;
+  /**
+   * True when the valid on-disk envelope carried retired keys that
+   * normalization dropped. Callers may re-save once so the file converges.
+   */
+  upgraded: boolean;
 }
 
 /** The strictest possible configuration. Used as the fail-closed baseline. */
@@ -37,7 +42,6 @@ export function defaultSettings(): Settings {
     activeProvider: null,
     configuredProviders: [],
     modelAlias: 'zippy',
-    safetyLevel: 'strict',
     xaiParentAck: false,
     localClassifier: true,
     lastProjectSlug: null,
@@ -46,12 +50,13 @@ export function defaultSettings(): Settings {
 
 /**
  * Fills fields added after a settings file was written and drops retired
- * ones. Runs after the MAC check (the MAC covers the envelope as written).
- * Older envelopes predate localClassifier: absent means on, the default.
+ * ones (ollamaClassifier, safetyLevel). Runs after the MAC check (the MAC
+ * covers the envelope as written). Older envelopes predate localClassifier:
+ * absent means on, the default.
  */
 export function normalizeSettings(stored: Settings): Settings {
-  const raw = stored as Settings & { ollamaClassifier?: boolean };
-  const { ollamaClassifier: _retired, ...kept } = raw;
+  const raw = stored as Settings & { ollamaClassifier?: boolean; safetyLevel?: string };
+  const { ollamaClassifier: _retiredOllama, safetyLevel: _retiredLevel, ...kept } = raw;
   return { ...kept, localClassifier: raw.localClassifier ?? true };
 }
 
@@ -118,28 +123,30 @@ export function loadSettings(): LoadSettingsResult {
     const setupMarkerExists = getSecret(SETUP_MARKER_ACCOUNT) !== null;
     if (setupMarkerExists) {
       // Setup finished before, yet the file is gone. Someone removed state.
-      return { settings: defaultSettings(), tampered: true, firstRun: false };
+      return { settings: defaultSettings(), tampered: true, firstRun: false, upgraded: false };
     }
-    return { settings: defaultSettings(), tampered: false, firstRun: true };
+    return { settings: defaultSettings(), tampered: false, firstRun: true, upgraded: false };
   }
 
   let envelope: SettingsEnvelope;
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (!isEnvelopeShape(parsed)) {
-      return { settings: defaultSettings(), tampered: true, firstRun: false };
+      return { settings: defaultSettings(), tampered: true, firstRun: false, upgraded: false };
     }
     envelope = parsed;
   } catch {
-    return { settings: defaultSettings(), tampered: true, firstRun: false };
+    return { settings: defaultSettings(), tampered: true, firstRun: false, upgraded: false };
   }
 
   const expectedMac = signSettings(envelope.settings);
   if (!macMatches(expectedMac, envelope.mac)) {
-    return { settings: defaultSettings(), tampered: true, firstRun: false };
+    return { settings: defaultSettings(), tampered: true, firstRun: false, upgraded: false };
   }
 
-  return { settings: normalizeSettings(envelope.settings), tampered: false, firstRun: false };
+  const raw = envelope.settings as Settings & Record<string, unknown>;
+  const upgraded = 'ollamaClassifier' in raw || 'safetyLevel' in raw;
+  return { settings: normalizeSettings(envelope.settings), tampered: false, firstRun: false, upgraded };
 }
 
 /**

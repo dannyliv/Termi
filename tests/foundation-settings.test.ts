@@ -34,7 +34,6 @@ afterEach(() => {
 describe('defaultSettings', () => {
   it('is the strictest configuration', () => {
     const d = defaultSettings();
-    expect(d.safetyLevel).toBe('strict');
     expect(d.activeProvider).toBeNull();
     expect(d.configuredProviders).toEqual([]);
     expect(d.installId).toBe('');
@@ -61,7 +60,6 @@ describe('loadSettings / saveSettings', () => {
       kidNickname: 'rocketfox',
       activeProvider: 'anthropic',
       configuredProviders: ['anthropic'],
-      safetyLevel: 'standard',
     });
     const result = loadSettings();
     expect(result.tampered).toBe(false);
@@ -70,15 +68,28 @@ describe('loadSettings / saveSettings', () => {
     expect(result.settings.kidNickname).toBe('rocketfox');
   });
 
-  it('upgrades an older envelope: ollamaClassifier out, localClassifier on', () => {
+  it('upgrades an older envelope: retired keys out, localClassifier on', () => {
     const old = { ...defaultSettings() } as Record<string, unknown>;
     delete old.localClassifier;
     old.ollamaClassifier = false;
+    old.safetyLevel = 'standard';
     saveSettings(old as unknown as Parameters<typeof saveSettings>[0]);
     const result = loadSettings();
     expect(result.tampered).toBe(false);
+    expect(result.upgraded).toBe(true);
     expect(result.settings.localClassifier).toBe(true);
     expect('ollamaClassifier' in result.settings).toBe(false);
+    expect('safetyLevel' in result.settings).toBe(false);
+
+    // The upgrade completes on disk: one re-save persists the new shape
+    // under a fresh MAC and later loads stop reporting an upgrade.
+    saveSettings(result.settings);
+    const envelope = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')) as SettingsEnvelope;
+    expect('safetyLevel' in envelope.settings).toBe(false);
+    expect('ollamaClassifier' in envelope.settings).toBe(false);
+    const reloaded = loadSettings();
+    expect(reloaded.tampered).toBe(false);
+    expect(reloaded.upgraded).toBe(false);
   });
 
   it('generates an installId on first save and keeps it after', () => {
@@ -104,11 +115,11 @@ describe('loadSettings / saveSettings', () => {
     saveSettings(defaultSettings());
     const file = settingsPath();
     const envelope = JSON.parse(fs.readFileSync(file, 'utf8')) as SettingsEnvelope;
-    envelope.settings.safetyLevel = 'standard';
+    envelope.settings.localClassifier = false;
     fs.writeFileSync(file, JSON.stringify(envelope, null, 2));
     const result = loadSettings();
     expect(result.tampered).toBe(true);
-    expect(result.settings.safetyLevel).toBe('strict');
+    expect(result.settings.localClassifier).toBe(true);
   });
 
   it('fails closed on unparseable settings.json', () => {

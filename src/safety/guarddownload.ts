@@ -26,6 +26,18 @@ export interface GuardFetchState {
 
 let state: GuardFetchState = { status: 'idle', written: 0, total: GUARD_MODEL.bytes };
 let inFlight: Promise<boolean> | null = null;
+let noticePending = false;
+
+/**
+ * True exactly once after a background fetch completes, then clears. The
+ * chat loop and the home menu both call this, so the kid hears "your
+ * safety helper is on" one time, on whichever screen they are looking at.
+ */
+export function consumeGuardReadyNotice(): boolean {
+  const pending = noticePending;
+  noticePending = false;
+  return pending;
+}
 
 /** Snapshot of the background fetch. 'ready' wins once the file exists. */
 export function guardFetchState(): GuardFetchState {
@@ -68,6 +80,7 @@ export function ensureGuardFetch(opts: DownloadGuardOptions = {}): Promise<boole
   })
     .then(() => {
       state = { ...state, status: 'ready', written: state.total };
+      noticePending = true;
       audit('local classifier model downloaded');
       return true;
     })
@@ -86,6 +99,7 @@ export function ensureGuardFetch(opts: DownloadGuardOptions = {}): Promise<boole
 export function resetGuardFetchForTests(): void {
   state = { status: 'idle', written: 0, total: GUARD_MODEL.bytes };
   inFlight = null;
+  noticePending = false;
 }
 
 const BAR_SLOTS = 10;

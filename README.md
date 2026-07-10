@@ -58,15 +58,28 @@ Run `termi`. The first run starts a setup wizard for a parent or guardian. It ta
 1. **Create a grown-up PIN** (at least 4 characters). It guards the grown-up zone. Your kid should not know it.
 2. **Age band and consent.** You pick "Under 13" or "13 or older" and confirm that Termi uses an AI account you own and that you agree to watch how your kid uses it. This consent is recorded in the local safety log.
 3. **Pick an AI provider.** The default is "ChatGPT sign-in": your browser opens, you sign in to your own ChatGPT account, and no API key is needed. The other options are a Claude API key, an OpenAI API key, or a Grok API key. Grok requires an extra confirmation because the xAI API terms are adults-only (details in SAFETY.md). You can add several providers and choose which one is active.
-4. **Pick a safety level.** Strict is the default and the right choice for most kids.
-5. **Safety checker download.** Termi offers a small safety model (623 MB) that screens every message right on your computer, even with no internet. It is on by default and worth keeping. The download runs in the background: setup continues, your kid can start building right away, the home menu shows a progress bar, and the checker turns itself on the moment the verified file lands. An interrupted download resumes on the next start. Details are in [SAFETY.md](SAFETY.md).
-6. **Hand the keyboard to your kid.** The kid picks a made-up nickname (Termi asks them not to use their real name) and sees a clear disclosure: "Termi is a computer program, an AI. It is a tool a grown-up set up for you. It is not a person."
-7. **Desktop shortcut.** Termi offers to write a double-clickable launcher on the Desktop (`Termi.command` on macOS, `Termi.bat` on Windows, `Termi.desktop` on Linux) so your kid can come back tomorrow without typing commands.
-8. **Optional first game.** Two keypresses later there is a running game in the browser.
+4. **Safety checker download.** Termi offers a small safety model (623 MB) that screens every message right on your computer, even with no internet. It is on by default and worth keeping. While it downloads, Termi tells you plainly that basic safety (the local filter plus the online checks) is already running, and asks whether you want to start building now or wait and watch the progress bar. Either way, the checker turns itself on the moment the verified file lands and Termi says so, even mid-session. The download is anonymous (no account or token needed) and resumes if interrupted. Details are in [SAFETY.md](SAFETY.md).
+5. **Hand the keyboard to your kid.** The kid picks a made-up nickname (Termi asks them not to use their real name) and sees a clear disclosure: "Termi is a computer program, an AI. It is a tool a grown-up set up for you. It is not a person."
+6. **Desktop shortcut.** Termi offers to write a double-clickable launcher on the Desktop (`Termi.command` on macOS, `Termi.bat` on Windows, `Termi.desktop` on Linux) so your kid can come back tomorrow without typing commands.
+7. **Optional first game.** Two keypresses later there is a running game in the browser.
 
 If you skip the provider step, Termi runs in offline mode: your kid can still create projects, play them in the preview, undo changes, and browse ideas. The chat shows a kind "ask a grown-up to set up the AI helper" screen.
 
 **If your kid does not know where to start:** every project type has a Build Quest (`/quest` in the chat), a five-step guided build with a ready prompt at each step, and a large idea deck (`/ideas`). Quest steps go through the same safety pipeline as any other message.
+
+### What keeps your kid safe
+
+Five layers sit between your kid and the AI, bound by one rule: when a check cannot finish, Termi blocks rather than guesses. There is no setting that weakens this.
+
+1. **A local filter on this computer.** Screens every message before it leaves the machine: profanity (including d.i.s.g.u.i.s.e.d spellings and leetspeak) and known "ignore your rules" tricks are blocked; personal details like names, addresses, phones, and school names are masked to `[secret]` before anything is sent.
+2. **Safety rules inside the AI's instructions.** The AI is a tool, never a friend: no romance, no secrets, no asking for real names, addresses, schools, ages, or photos. Big feelings get one kind line and a pointer to a trusted adult.
+3. **An on-device safety checker.** A small AI model (on by default, 623 MB) grades every message in and out right on your computer, even with no internet.
+4. **Checks on everything the AI produces.** The reply, every file it writes, and the human-visible text inside those files are all screened before your kid sees a single character, plus a code scan for network calls and hidden tricks.
+5. **A session-wide grooming watch.** Secrecy asks, affection aimed at the kid, probing for personal details, and attempts to move the chat to another app are counted across the whole conversation, and a hard block trips when the signals stack, no matter how innocent each message looked alone.
+
+**What gets filtered:** sexual content, self-harm (answered with a calm, supportive screen and the 988 line in the US), violence past a mild cartoon ceiling, hate and bullying, dangerous how-tos, profanity, personal information, grooming patterns, heavy adult and political topics, wholesale copying of others' work, and attempts to break the AI's rules. Normal game talk ("make the zombie disappear when you hit it") is deliberately allowed.
+
+Parents get a PIN-gated grown-up zone, a tamper-evident log of every block and settings change, and honest documentation: [SAFETY.md](SAFETY.md) explains how each layer works, what one message costs, and what a determined kid can and cannot get past.
 
 ### Commands
 
@@ -101,7 +114,7 @@ Inside the build chat, these slash commands work:
 
 Plain words work too: `undo`, `help`, `ideas`, `done`, `preview`, `badges`, `learn`, `quest`, and `quit` work on their own, no slash needed, and `exit`, `stop`, `bye`, and `leave` also quit. (`redo`, `new`, and `grownups` need the slash.) Misspelled commands get a "did you mean" suggestion.
 
-In the grown-up zone you can add, switch, or remove providers, change the safety level, manage the on-device safety checker (turn it on or off, download or remove its model file), pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives. Removing a provider deletes its saved key or sign-in from this computer.
+In the grown-up zone you can add, switch, or remove providers, manage the on-device safety checker (turn it on or off, download or remove its model file), pick the model speed (Zippy, the fast default, or Extra smart for tricky asks), read the usage and quota note, review the safety log, and see exactly where your data lives. Removing a provider deletes its saved key or sign-in from this computer.
 
 ### The nine project types
 
