@@ -17,9 +17,6 @@ import {
   guardFetchState,
   guardProgressBar,
 } from '../safety/guarddownload.js';
-import { nameIsOkay } from '../safety/prefilter.js';
-import { scaffolds, scaffoldById } from '../projects/scaffolds/index.js';
-import { suggestProjectNames } from '../setup/wizard.js';
 import { BADGES, celebrate, confetti } from '../ui/celebrate.js';
 import { mascot } from '../ui/mascot.js';
 import { style } from '../ui/theme.js';
@@ -115,181 +112,27 @@ export function recapFromTermiMd(text: string): string | null {
 }
 
 type StoreModule = typeof import('../projects/store.js');
-type CreateModule = typeof import('../projects/create.js');
 
-async function loadProjectModules(): Promise<{ store: StoreModule; create: CreateModule } | null> {
+async function loadStore(): Promise<StoreModule | null> {
   try {
-    const store = await import('../projects/store.js');
-    const create = await import('../projects/create.js');
-    return { store, create };
+    return await import('../projects/store.js');
   } catch {
     return null;
   }
 }
 
-const CUSTOM_NAME = '__custom__';
-
-async function pickProjectName(themeLabel: string): Promise<string | null> {
-  const suggestions = suggestProjectNames(themeLabel);
-  const pick = await p.select<string>({
-    message: 'Pick a name.',
-    options: [
-      ...suggestions.map((name) => ({ value: name, label: name })),
-      { value: CUSTOM_NAME, label: 'Type my own name' },
-    ],
-  });
-  if (p.isCancel(pick)) {
-    return null;
-  }
-  if (pick !== CUSTOM_NAME) {
-    return pick;
-  }
-  const typed = await p.text({
-    message: 'What is its name?',
-    validate: (value) => {
-      const trimmed = (value ?? '').trim();
-      if (trimmed.length === 0) return 'It needs a name.';
-      if (!nameIsOkay(trimmed)) return 'That name will not work. Try another one.';
-      return undefined;
-    },
-  });
-  if (p.isCancel(typed)) {
-    return null;
-  }
-  return typed.trim();
-}
-
-async function remixFlow(
-  store: StoreModule,
-  create: CreateModule,
-): Promise<ProjectContext | null> {
-  const metas = store.listProjects();
-  const sourceSlug = await p.select<string>({
-    message: 'Which project do you want to remix?',
-    options: metas.map((m) => ({ value: m.slug, label: m.prettyName })),
-  });
-  if (p.isCancel(sourceSlug)) {
-    return null;
-  }
-  const source = store.openProject(sourceSlug);
-  if (source === null) {
-    p.log.warn('I could not open that one.');
-    return null;
-  }
-  for (;;) {
-    const name = await p.text({
-      message: 'Name your remix.',
-      validate: (value) => ((value ?? '').trim().length > 0 ? undefined : 'It needs a name.'),
-    });
-    if (p.isCancel(name)) {
-      return null;
-    }
-    const trimmed = name.trim();
-    if (create.slugifyName(trimmed).collision) {
-      p.log.warn('That name is taken. Try another one.');
-      continue;
-    }
-    const made = create.createProject(source.meta.scaffoldId, source.meta.themeId, trimmed);
-    for (const file of source.listKidFiles()) {
-      const content = source.readFile(file.relPath);
-      if (content !== null) {
-        made.project.writeFile(file.relPath, content);
-      }
-    }
-    await awardBadge('remixer');
-    return made.project;
-  }
-}
-
 /**
- * The full new-project flow: scaffold, theme, name (with collision help),
- * remix option, badges. Returns the created project, or null on cancel.
+ * New project entry: always Build a game (blank shell + idea list).
+ * Multi-scaffold stock starters are no longer on the kid path.
  */
 export async function runNewProject(settings: Settings): Promise<ProjectContext | null> {
-  void settings;
-  const mods = await loadProjectModules();
-  if (mods === null) {
-    p.log.warn('Project tools are not ready yet.');
+  try {
+    const build = await import('./buildGame.js');
+    return await build.runBuildGame(settings);
+  } catch {
+    p.log.warn('Build a game is taking a nap. Try again soon.');
     return null;
   }
-  const { store, create } = mods;
-  const existing = store.listProjects();
-  const options: { value: string; label: string; hint?: string }[] = scaffolds.map((s) => ({
-    value: s.id,
-    label: `${s.emoji} ${s.label}`,
-    hint: s.ageNote,
-  }));
-  if (existing.length > 0) {
-    options.push({
-      value: '__remix__',
-      label: 'Remix one of your projects',
-      hint: 'Copy a project and make it new.',
-    });
-  }
-  const pick = await p.select<string>({ message: 'What do you want to make?', options });
-  if (p.isCancel(pick)) {
-    return null;
-  }
-  if (pick === '__remix__') {
-    return remixFlow(store, create);
-  }
-  const scaffold = scaffoldById(pick);
-  if (scaffold === undefined) {
-    return null;
-  }
-  const themeId = await p.select<string>({
-    message: 'Pick a style.',
-    options: scaffold.themes.map((t) => ({ value: t.id, label: `${t.emoji} ${t.label}` })),
-  });
-  if (p.isCancel(themeId)) {
-    return null;
-  }
-  const theme = scaffold.themes.find((t) => t.id === themeId);
-  if (theme === undefined) {
-    return null;
-  }
-
-  let prettyName = await pickProjectName(theme.label);
-  if (prettyName === null) {
-    return null;
-  }
-  const slugInfo = create.slugifyName(prettyName);
-  if (slugInfo.collision) {
-    const what = await p.select<string>({
-      message: 'You already have a project with that name.',
-      options: [
-        { value: 'open', label: 'Open it' },
-        { value: 'suffix', label: `Call this one ${prettyName} 2` },
-        { value: 'rename', label: 'Pick a new name' },
-      ],
-    });
-    if (p.isCancel(what)) {
-      return null;
-    }
-    if (what === 'open') {
-      return store.openProject(slugInfo.slug);
-    }
-    if (what === 'suffix') {
-      prettyName = `${prettyName} 2`;
-    } else {
-      const again = await pickProjectName(theme.label);
-      if (again === null) {
-        return null;
-      }
-      prettyName = again;
-    }
-  }
-
-  const made = create.createProject(scaffold.id, theme.id, prettyName);
-  await awardBadge('first-project');
-  if (store.listProjects().length >= 5) {
-    await awardBadge('five-projects');
-  }
-  const starters = made.starterPrompts.slice(0, 2);
-  if (starters.length > 0) {
-    p.note(starters.map((line) => `- ${line}`).join('\n'), 'Try saying');
-  }
-  return made.project;
 }
 
 /**
@@ -477,12 +320,12 @@ export async function showHome(settings: Settings): Promise<void> {
 }
 
 async function openPicked(settings: Settings): Promise<void> {
-  const mods = await loadProjectModules();
-  if (mods === null) {
+  const store = await loadStore();
+  if (store === null) {
     p.log.warn('Project tools are not ready yet.');
     return;
   }
-  const metas = mods.store.listProjects();
+  const metas = store.listProjects();
   if (metas.length === 0) {
     p.log.info('No games yet. Pick "Build a game"!');
     return;
@@ -493,14 +336,14 @@ async function openPicked(settings: Settings): Promise<void> {
       ? settings.lastProjectSlug
       : first?.slug;
   const pick = await p.select<string>({
-    message: 'Pick a project.',
+    message: 'Pick a game.',
     options: metas.map((m) => ({ value: m.slug, label: m.prettyName })),
     ...(initial !== undefined ? { initialValue: initial } : {}),
   });
   if (p.isCancel(pick)) {
     return;
   }
-  const project = mods.store.openProject(pick);
+  const project = store.openProject(pick);
   if (project === null) {
     p.log.warn('I could not open that one.');
     return;

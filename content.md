@@ -498,6 +498,8 @@ budget), and add both must-block and must-not-block cases to
 
 ## Release log (short)
 
+- **0.2.4 (2026-07-10):** E2E build-flow tests (blank shell, preview HTTP,
+  agent write+reload, L0 block). runNewProject delegates to runBuildGame only.
 - **0.2.3 (2026-07-10):** Suggested prompt: explicit "Run it" / "Edit it first"
   (clack long text initialValue was unreliable; Enter no longer required).
 - **0.2.2 (2026-07-10):** Fix suggested-prompt Enter: pre-fill with
